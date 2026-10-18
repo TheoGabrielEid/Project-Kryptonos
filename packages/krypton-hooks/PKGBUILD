@@ -1,8 +1,8 @@
-# Maintainer: AuraOS Core Team <dev@auraos.org>
-pkgname=aura-hooks
+# Maintainer: KryptonOS Core Team <dev@kryptonos.org>
+pkgname=krypton-hooks
 pkgver=1.0.0
 pkgrel=1
-pkgdesc="AuraOS Pacman hooks for automatic system optimization and config synchronization"
+pkgdesc="KryptonOS Pacman hooks for automatic system optimization and config synchronization"
 arch=('any')
 license=('GPL3')
 depends=('pacman')
@@ -11,7 +11,7 @@ package() {
     install -d "${pkgdir}/usr/share/libalpm/hooks"
 
     # Hook: Auto-update font cache on package installs
-    cat << 'EOF' > "${pkgdir}/usr/share/libalpm/hooks/90-aura-fontconfig.hook"
+    cat << 'EOF' > "${pkgdir}/usr/share/libalpm/hooks/90-krypton-fontconfig.hook"
 [Trigger]
 Type = Path
 Operation = Install
@@ -20,13 +20,13 @@ Operation = Remove
 Target = usr/share/fonts/*
 
 [Action]
-Description = [AuraOS] Updating system font cache...
+Description = [KryptonOS] Updating system font cache...
 When = PostTransaction
 Exec = /usr/bin/fc-cache -s
 EOF
 
     # Hook: Recompile GTK & Icon caches
-    cat << 'EOF' > "${pkgdir}/usr/share/libalpm/hooks/95-aura-icon-cache.hook"
+    cat << 'EOF' > "${pkgdir}/usr/share/libalpm/hooks/95-krypton-icon-cache.hook"
 [Trigger]
 Type = Path
 Operation = Install
@@ -35,7 +35,7 @@ Operation = Remove
 Target = usr/share/icons/*
 
 [Action]
-Description = [AuraOS] Updating icon theme caches...
+Description = [KryptonOS] Updating icon theme caches...
 When = PostTransaction
 Exec = /usr/bin/gtk-update-icon-cache -q -t -f /usr/share/icons/hicolor
 EOF

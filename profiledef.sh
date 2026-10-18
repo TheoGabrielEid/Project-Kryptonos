@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# profiledef.sh - Archiso metadata configuration for AuraOS
+# profiledef.sh - Archiso metadata configuration for KryptonOS
 
-iso_name="auraos"
-iso_label="AURAOS_$(date +%Y%m)"
-iso_publisher="AuraOS Project <https://github.com/auraos>"
-iso_application="AuraOS Hyprland Live / Installer"
+iso_name="kryptonos"
+iso_label="KRYPTON_$(date +%Y%m)"
+iso_publisher="KryptonOS Project <https://github.com/kryptonos>"
+iso_application="KryptonOS Hyprland Live / Installer"
 iso_version="$(date +%Y.%m.%d)"
 install_dir="arch"
 buildmodes=('iso')
@@ -21,6 +21,6 @@ file_permissions=(
   ["/etc/gshadow"]="0:0:400"
   ["/etc/sudoers.d"]="0:0:750"
   ["/root"]="0:0:700"
-  ["/usr/local/bin/aura-welcome"]="0:0:755"
-  ["/usr/local/bin/aura-install"]="0:0:755"
+  ["/usr/local/bin/krypton-welcome"]="0:0:755"
+  ["/usr/local/bin/krypton-install"]="0:0:755"
 )

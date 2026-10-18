@@ -1,4 +1,4 @@
-# AuraOS .zshrc
+# KryptonOS .zshrc
 
 # History
 HISTFILE=~/.zsh_history
@@ -15,7 +15,7 @@ alias grep='rg'
 alias find='fd'
 alias top='btop'
 alias y='yazi'
-alias aura-install='sudo calamares'
+alias krypton-install='sudo calamares'
 
 # Keybindings
 bindkey -e

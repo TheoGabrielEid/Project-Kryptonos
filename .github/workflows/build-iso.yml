@@ -1,27 +1,71 @@
-name: Build AuraOS ISO
+name: Build Distro ISO
 
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, master ]
 
 jobs:
-  build:
+  build-and-release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
     steps:
-      - name: Checkout Repository
+      - name: Checkout Source Code
         uses: actions/checkout@v4
 
-      - name: Run Arch Linux Container & Build ISO
+      - name: Build Custom Packages & Distro ISO
         run: |
           docker run --privileged --rm -v "${PWD}:/workspace" archlinux:latest bash -c "
-            pacman -Syu --noconfirm archiso base-devel git
+            set -euo pipefail
+            echo '==> Updating Arch repositories and installing build tools...'
+            pacman -Syu --noconfirm archiso base-devel git sudo
+
+            echo '==> Setting up non-root build user for makepkg...'
+            useradd -m -G wheel builder
+            echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
             cd /workspace
-            bash build.sh
+
+            echo '==> Building Custom Packages & Distro Repo...'
+            chown -R builder:builder /workspace
+            su builder -c '
+              mkdir -p /workspace/repo-builder/x86_64
+              for pkg in /workspace/packages/*; do
+                if [ -d \"\$pkg\" ] && [ -f \"\$pkg/PKGBUILD\" ]; then
+                  echo \"Building \$pkg...\"
+                  cd \"\$pkg\"
+                  makepkg -sc --noconfirm --nocheck
+                  mv ./*.pkg.tar.zst /workspace/repo-builder/x86_64/ || true
+                fi
+              done
+              cd /workspace/repo-builder/x86_64
+              repo-add -s -n -R kryptonos.db.tar.zst ./*.pkg.tar.zst
+            '
+
+            echo '==> Registering local repository for ISO builder...'
+            mkdir -p /var/krypton-repo/x86_64
+            cp -r /workspace/repo-builder/x86_64/* /var/krypton-repo/x86_64/
+
+            echo '==> Building Bootable ISO with mkarchiso...'
+            mkdir -p /workspace/out /tmp/archiso-work
+            mkarchiso -v -w /tmp/archiso-work -o /workspace/out /workspace
           "
 
-      - name: Upload ISO Artifact
+      - name: Upload ISO to Workflow Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AuraOS-ISO
+          name: KryptonOS-Live-ISO
           path: out/*.iso
+          retention-days: 14
+
+      - name: Create GitHub Release with Bootable ISO
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: out/*.iso
+          tag_name: ${{ github.ref_name }}
+          name: "KryptonOS Release ${{ github.ref_name }}"
+          draft: false
+          prerelease: false

@@ -1,7 +1,7 @@
-# AuraOS Distro Packages
-aura-branding
-aura-settings
-aura-hooks
+# KryptonOS Distro Packages
+krypton-branding
+krypton-settings
+krypton-hooks
 
 # Core System & Kernel
 base

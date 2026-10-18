@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# KryptonOS Welcome & Installer Notification
+sleep 2
+notify-send "Welcome to KryptonOS" "Press Super+Space for apps, Super+Return for Kitty, or click Install to start Calamares." --icon=archlinux -u normal

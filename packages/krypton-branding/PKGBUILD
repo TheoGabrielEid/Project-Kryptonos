@@ -1,0 +1,38 @@
+# Maintainer: KryptonOS Core Team <dev@kryptonos.org>
+pkgname=krypton-branding
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="KryptonOS core distro branding, release information, and system identification"
+arch=('any')
+license=('GPL3')
+provides=('os-release' 'system-release')
+
+package() {
+    install -d "${pkgdir}/usr/lib"
+    install -d "${pkgdir}/etc"
+
+    # OS Identification (Standard /etc/os-release used by neofetch, fastfetch, systemd)
+    cat << 'EOF' > "${pkgdir}/usr/lib/os-release"
+NAME="KryptonOS"
+PRETTY_NAME="KryptonOS Linux"
+ID=kryptonos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;166;227;161"
+HOME_URL="https://kryptonos.org"
+SUPPORT_URL="https://forum.kryptonos.org"
+BUG_REPORT_URL="https://github.com/kryptonos/kryptonos/issues"
+LOGO=kryptonos
+EOF
+
+    ln -sf /usr/lib/os-release "${pkgdir}/etc/os-release"
+
+    # TTY Issue Banner
+    cat << 'EOF' > "${pkgdir}/etc/issue"
+ \e[1;38;2;166;227;161mKryptonOS Linux \r (\l)\e[0m
+ \e[38;2;137;180;250mAesthetic Hyprland & High-Performance Ecosystem\e[0m
+
+EOF
+
+    echo "kryptonos" > "${pkgdir}/etc/hostname"
+}
