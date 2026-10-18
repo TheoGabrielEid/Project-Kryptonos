@@ -1,0 +1,42 @@
+# Maintainer: AuraOS Core Team <dev@auraos.org>
+pkgname=aura-branding
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="AuraOS core distro branding, release information, and system identification"
+arch=('any')
+url="https://github.com/auraos/aura-branding"
+license=('GPL3')
+provides=('os-release' 'system-release')
+conflicts=('filesystem<2024.01.01')
+
+package() {
+    install -d "${pkgdir}/usr/lib"
+    install -d "${pkgdir}/etc"
+
+    # OS Identification (Standard /etc/os-release used by neofetch, systemd, GUI apps)
+    cat << 'EOF' > "${pkgdir}/usr/lib/os-release"
+NAME="AuraOS"
+PRETTY_NAME="AuraOS Linux"
+ID=auraos
+ID_LIKE=arch
+BUILD_ID=rolling
+ANSI_COLOR="38;2;203;166;247"
+HOME_URL="https://auraos.org"
+SUPPORT_URL="https://forum.auraos.org"
+BUG_REPORT_URL="https://github.com/auraos/auraos/issues"
+LOGO=auraos
+EOF
+
+    # Symlink /etc/os-release
+    ln -sf /usr/lib/os-release "${pkgdir}/etc/os-release"
+
+    # TTY Issue Banner
+    cat << 'EOF' > "${pkgdir}/etc/issue"
+ \e[1;38;2;203;166;247mAuraOS Linux \r (\l)\e[0m
+ \e[38;2;137;180;250mModern Hyprland & High-Performance Ecosystem\e[0m
+
+EOF
+
+    # Hostname default
+    echo "auraos" > "${pkgdir}/etc/hostname"
+}

@@ -1,3 +1,8 @@
+# AuraOS Distro Packages
+aura-branding
+aura-settings
+aura-hooks
+
 # Core System & Kernel
 base
 base-devel

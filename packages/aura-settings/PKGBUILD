@@ -1,0 +1,29 @@
+# Maintainer: AuraOS Core Team <dev@auraos.org>
+pkgname=aura-settings
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="AuraOS default desktop settings, Hyprland presets, Waybar themes, and Kitty configs"
+arch=('any')
+license=('GPL3')
+depends=('hyprland' 'waybar' 'kitty' 'starship' 'zsh' 'yazi' 'rofi-wayland' 'swaync')
+
+package() {
+    install -d "${pkgdir}/etc/skel/.config"
+
+    # Install user desktop presets directly into skeleton directory
+    cp -r "${startdir}/../../airootfs/etc/skel/.config/"* "${pkgdir}/etc/skel/.config/"
+    install -Dm644 "${startdir}/../../airootfs/etc/skel/.zshrc" "${pkgdir}/etc/skel/.zshrc"
+
+    # Install global environment flags for Wayland
+    install -d "${pkgdir}/etc/environment.d"
+    cat << 'EOF' > "${pkgdir}/etc/environment.d/10-aura-wayland.conf"
+MOZ_ENABLE_WAYLAND=1
+QT_QPA_PLATFORM=wayland;xcb
+GDK_BACKEND=wayland,x11,*
+SDL_VIDEODRIVER=wayland
+CLUTTER_BACKEND=wayland
+XDG_CURRENT_DESKTOP=Hyprland
+XDG_SESSION_TYPE=wayland
+XDG_SESSION_DESKTOP=Hyprland
+EOF
+}
