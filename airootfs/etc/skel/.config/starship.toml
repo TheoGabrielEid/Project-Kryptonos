@@ -1,0 +1,56 @@
+# Starship prompt configuration for AuraOS
+
+format = """
+[░▒▓](#89b4fa)\
+[ 󰣇 ](bg:#89b4fa fg:#11111b)\
+[](bg:#313244 fg:#89b4fa)\
+$directory\
+[](fg:#313244 bg:#45475a)\
+$git_branch\
+$git_status\
+[](fg:#45475a bg:#585b70)\
+$nodejs\
+$rust\
+$golang\
+$python\
+[](fg:#585b70)\
+$character"""
+
+[directory]
+style = "fg:#cdd6f4 bg:#313244"
+format = "[ $path ]($style)"
+truncation_length = 3
+truncation_symbol = "…/"
+
+[git_branch]
+style = "fg:#f5e0dc bg:#45475a"
+format = "[[ $symbol $branch ]($style)]()"
+symbol = ""
+
+[git_status]
+style = "fg:#f38ba8 bg:#45475a"
+format = "[$all_status$ahead_behind]($style)"
+
+[nodejs]
+style = "fg:#a6e3a1 bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = "󰎙"
+
+[rust]
+style = "fg:#fab387 bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = "󱘗"
+
+[golang]
+style = "fg:#89dceb bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = "󰟓"
+
+[python]
+style = "fg:#f9e2af bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = "󰌠"
+
+[character]
+success_symbol = "[ ❯](bold #a6e3a1)"
+error_symbol = "[ ❯](bold #f38ba8)"

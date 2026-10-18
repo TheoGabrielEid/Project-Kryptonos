@@ -1,0 +1,27 @@
+name: Build AuraOS ISO
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Run Arch Linux Container & Build ISO
+        run: |
+          docker run --privileged --rm -v "${PWD}:/workspace" archlinux:latest bash -c "
+            pacman -Syu --noconfirm archiso base-devel git
+            cd /workspace
+            bash build.sh
+          "
+
+      - name: Upload ISO Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AuraOS-ISO
+          path: out/*.iso

@@ -1,0 +1,92 @@
+* {
+    border: none;
+    border-radius: 0;
+    font-family: "JetBrainsMono Nerd Font", monospace;
+    font-weight: bold;
+    font-size: 13px;
+    min-height: 0;
+}
+
+window#waybar {
+    background: transparent;
+    color: #cdd6f4;
+}
+
+/* Individual Pill styling */
+#custom-launcher,
+#workspaces,
+#window,
+#clock,
+#pulseaudio,
+#network,
+#cpu,
+#memory,
+#battery,
+#tray,
+#custom-power {
+    background-color: rgba(30, 30, 46, 0.85);
+    padding: 2px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(203, 166, 247, 0.2);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+#custom-launcher {
+    font-size: 16px;
+    color: #89b4fa;
+    margin-right: 6px;
+}
+
+#workspaces button {
+    padding: 0 6px;
+    color: #6c7086;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+#workspaces button.active {
+    color: #cba6f7;
+    background-color: rgba(203, 166, 247, 0.2);
+}
+
+#workspaces button:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #f5e0dc;
+}
+
+#clock {
+    color: #fab387;
+}
+
+#pulseaudio {
+    color: #a6e3a1;
+}
+
+#network {
+    color: #89dceb;
+}
+
+#cpu {
+    color: #f38ba8;
+}
+
+#memory {
+    color: #f9e2af;
+}
+
+#battery {
+    color: #a6e3a1;
+}
+
+#battery.warning {
+    color: #fab387;
+}
+
+#battery.critical {
+    color: #f38ba8;
+}
+
+#custom-power {
+    color: #f38ba8;
+    margin-left: 6px;
+}
