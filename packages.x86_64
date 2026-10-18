@@ -9,6 +9,12 @@ base-devel
 linux
 linux-firmware
 linux-headers
+mkinitcpio
+mkinitcpio-archiso
+syslinux
+edk2-shell
+efibootmgr
+grub
 btrfs-progs
 e2fsprogs
 dosfstools
@@ -85,20 +91,10 @@ noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 papirus-icon-theme
-catppuccin-gtk-theme-mocha
+breeze-gtk
 
 # Text Editing & Utilities
 neovim
 micro
 firefox
-
-# Calamares GUI Installer
-calamares
-boost-libs
-kconfig
-kcoreaddons
-kiconthemes
-kio
-solid
-yaml-cpp
-parted
+archinstall

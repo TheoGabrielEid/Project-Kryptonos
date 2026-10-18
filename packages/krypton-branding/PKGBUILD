@@ -8,31 +8,36 @@ license=('GPL3')
 provides=('os-release' 'system-release')
 
 package() {
-    install -d "${pkgdir}/usr/lib"
     install -d "${pkgdir}/etc"
+    install -d "${pkgdir}/usr/share/libalpm/hooks"
 
-    # OS Identification (Standard /etc/os-release used by neofetch, fastfetch, systemd)
-    cat << 'EOF' > "${pkgdir}/usr/lib/os-release"
+    # Store KryptonOS os-release template
+    cat << 'EOF' > "${pkgdir}/etc/krypton-release"
 NAME="KryptonOS"
 PRETTY_NAME="KryptonOS Linux"
 ID=kryptonos
 ID_LIKE=arch
 BUILD_ID=rolling
 ANSI_COLOR="38;2;166;227;161"
-HOME_URL="https://kryptonos.org"
-SUPPORT_URL="https://forum.kryptonos.org"
-BUG_REPORT_URL="https://github.com/kryptonos/kryptonos/issues"
-LOGO=kryptonos
+HOME_URL="https://github.com/TheoGabrielEid/Project-Kryptonos"
+LOGO=archlinux-logo
 EOF
 
-    ln -sf /usr/lib/os-release "${pkgdir}/etc/os-release"
+    # ALPM Hook to apply KryptonOS branding over /etc/os-release after filesystem installs
+    cat << 'EOF' > "${pkgdir}/usr/share/libalpm/hooks/99-krypton-branding.hook"
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Package
+Target = filesystem
+Target = krypton-branding
 
-    # TTY Issue Banner
-    cat << 'EOF' > "${pkgdir}/etc/issue"
- \e[1;38;2;166;227;161mKryptonOS Linux \r (\l)\e[0m
- \e[38;2;137;180;250mAesthetic Hyprland & High-Performance Ecosystem\e[0m
-
+[Action]
+Description = [KryptonOS] Applying OS branding and release identity...
+When = PostTransaction
+Exec = /usr/bin/cp -f /etc/krypton-release /usr/lib/os-release
 EOF
 
+    # Hostname default
     echo "kryptonos" > "${pkgdir}/etc/hostname"
 }

@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-release:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -17,40 +17,60 @@ jobs:
 
       - name: Build Custom Packages & Distro ISO
         run: |
-          docker run --privileged --rm -v "${PWD}:/workspace" archlinux:latest bash -c "
+          HOST_UID=$(id -u)
+          HOST_GID=$(id -g)
+          docker run --privileged --rm \
+            -e HOST_UID="${HOST_UID}" \
+            -e HOST_GID="${HOST_GID}" \
+            -v "${PWD}:/workspace" \
+            archlinux:latest bash -c "
             set -euo pipefail
+
             echo '==> Updating Arch repositories and installing build tools...'
             pacman -Syu --noconfirm archiso base-devel git sudo
+
+            echo '==> Preparing isolated ISO build workspace...'
+            cp -r /workspace /tmp/iso-profile
+
+            echo '==> Syncing standard bootloader configs (syslinux, efiboot, grub) from archiso releng...'
+            cp -rn /usr/share/archiso/configs/releng/syslinux /tmp/iso-profile/
+            cp -rn /usr/share/archiso/configs/releng/efiboot /tmp/iso-profile/
+            cp -rn /usr/share/archiso/configs/releng/grub /tmp/iso-profile/ || true
 
             echo '==> Setting up non-root build user for makepkg...'
             useradd -m -G wheel builder
             echo 'builder ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-            cd /workspace
-
             echo '==> Building Custom Packages & Distro Repo...'
-            chown -R builder:builder /workspace
+            chown -R builder:builder /tmp/iso-profile
+
             su builder -c '
-              mkdir -p /workspace/repo-builder/x86_64
-              for pkg in /workspace/packages/*; do
+              mkdir -p /tmp/iso-profile/repo-builder/x86_64
+              for pkg in /tmp/iso-profile/packages/*; do
                 if [ -d \"\$pkg\" ] && [ -f \"\$pkg/PKGBUILD\" ]; then
                   echo \"Building \$pkg...\"
                   cd \"\$pkg\"
-                  makepkg -sc --noconfirm --nocheck
-                  mv ./*.pkg.tar.zst /workspace/repo-builder/x86_64/ || true
+                  makepkg -d --noconfirm --nocheck
+                  mv ./*.pkg.tar.zst /tmp/iso-profile/repo-builder/x86_64/ || true
                 fi
               done
-              cd /workspace/repo-builder/x86_64
-              repo-add -s -n -R kryptonos.db.tar.zst ./*.pkg.tar.zst
+              cd /tmp/iso-profile/repo-builder/x86_64
+              repo-add -n -R kryptonos.db.tar.zst ./*.pkg.tar.zst
             '
 
             echo '==> Registering local repository for ISO builder...'
             mkdir -p /var/krypton-repo/x86_64
-            cp -r /workspace/repo-builder/x86_64/* /var/krypton-repo/x86_64/
+            cp -r /tmp/iso-profile/repo-builder/x86_64/* /var/krypton-repo/x86_64/
+
+            echo '==> Validating packages in packages.x86_64 against repos...'
+            pacman --config /tmp/iso-profile/pacman.conf -Sy
 
             echo '==> Building Bootable ISO with mkarchiso...'
             mkdir -p /workspace/out /tmp/archiso-work
-            mkarchiso -v -w /tmp/archiso-work -o /workspace/out /workspace
+            mkarchiso -v -w /tmp/archiso-work -o /workspace/out /tmp/iso-profile
+
+            echo '==> Restoring output ownership to runner user...'
+            chown -R \${HOST_UID}:\${HOST_GID} /workspace/out
           "
 
       - name: Upload ISO to Workflow Artifacts

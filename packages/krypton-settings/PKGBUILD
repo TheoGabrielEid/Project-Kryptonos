@@ -5,14 +5,14 @@ pkgrel=1
 pkgdesc="KryptonOS default desktop settings, Hyprland presets, Waybar themes, and Kitty configs"
 arch=('any')
 license=('GPL3')
-depends=('hyprland' 'waybar' 'kitty' 'starship' 'zsh' 'yazi' 'rofi-wayland' 'swaync')
+depends=('hyprland' 'waybar' 'kitty' 'starship' 'zsh' 'yazi' 'swaync')
 
 package() {
-    install -d "${pkgdir}/etc/skel/.config"
+    install -d "${pkgdir}/usr/share/krypton/skel/.config"
 
-    # Install user desktop presets directly into skeleton directory
-    cp -r "${startdir}/../../airootfs/etc/skel/.config/"* "${pkgdir}/etc/skel/.config/"
-    install -Dm644 "${startdir}/../../airootfs/etc/skel/.zshrc" "${pkgdir}/etc/skel/.zshrc"
+    # Install user desktop presets into /usr/share/krypton/skel
+    cp -r "${startdir}/../../airootfs/etc/skel/.config/"* "${pkgdir}/usr/share/krypton/skel/.config/"
+    install -Dm644 "${startdir}/../../airootfs/etc/skel/.zshrc" "${pkgdir}/usr/share/krypton/skel/.zshrc"
 
     # Install global environment flags for Wayland
     install -d "${pkgdir}/etc/environment.d"
