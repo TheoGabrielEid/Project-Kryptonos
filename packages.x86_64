@@ -1,66 +1,112 @@
+# ==============================================================================
+# KryptonOS Daily-Driver Package List (x86_64)
+# ==============================================================================
+
 # KryptonOS Distro Packages
 krypton-branding
 krypton-settings
 krypton-hooks
 
-# Core System & Kernel
+# Core System, Kernel & Boot
 base
 base-devel
 linux
 linux-firmware
 linux-headers
+intel-ucode
+amd-ucode
 mkinitcpio
 mkinitcpio-archiso
 syslinux
 edk2-shell
 efibootmgr
 grub
+os-prober
+zram-generator
+
+# Filesystems & Storage
 btrfs-progs
 e2fsprogs
 dosfstools
 ntfs-3g
+exfatprogs
+udisks2
+gvfs
+gvfs-mtp
+gvfs-smb
+gvfs-afc
+gvfs-gphoto2
+
+# Graphics & Hardware Acceleration (Mesa, Vulkan, VA-API)
+mesa
+vulkan-radeon
+vulkan-intel
+vulkan-icd-loader
+libva-mesa-driver
+sof-firmware
+alsa-firmware
+alsa-utils
+
+# Networking, Wi-Fi & Bluetooth
 networkmanager
 network-manager-applet
+nm-connection-editor
 wireless_tools
 wpa_supplicant
+iwd
 bluez
 bluez-utils
+blueman
+openssh
+
+# Audio (PipeWire Full Stack)
 pipewire
 pipewire-pulse
 pipewire-alsa
 pipewire-jack
 wireplumber
 pavucontrol
-sudo
-git
-curl
-wget
-reflector
-arch-install-scripts
+pamixer
+playerctl
 
-# Hyprland & Wayland Core
+# Display Manager (SDDM)
+sddm
+qt6-svg
+qt6-declarative
+qt5-quickcontrols2
+
+# Hyprland & Daily Wayland Desktop
 hyprland
 hyprpaper
 hyprlock
 hypridle
+hyprpicker
 xdg-desktop-portal-hyprland
 xdg-desktop-portal-gtk
+xdg-user-dirs
+xdg-utils
 polkit-gnome
 qt5-wayland
 qt6-wayland
 waybar
 rofi-wayland
 swaync
+libnotify
 wl-clipboard
 cliphist
 grim
 slurp
+swappy
+wf-recorder
 brightnessctl
-playerctl
+wlr-randr
+nwg-look
 
 # Terminal & Shell Experience
 kitty
 zsh
+zsh-autosuggestions
+zsh-syntax-highlighting
 starship
 fastfetch
 bat
@@ -70,31 +116,67 @@ ripgrep
 fzf
 zoxide
 btop
+tmux
+git
+lazygit
+curl
+wget
+unzip
+zip
+unrar
+7zip
+jq
+reflector
+man-db
+man-pages
 
-# File Managers
+# File Managers (TUI + GUI)
 yazi
 ffmpegthumbnailer
 poppler
-7zip
-jq
+imagemagick
 thunar
 thunar-volman
 thunar-archive-plugin
-gvfs
-gvfs-mtp
+thunar-media-tags-plugin
+file-roller
 tumbler
+
+# Daily-Driver Applications
+firefox
+mpv
+imv
+evince
+gnome-calculator
+gnome-disk-utility
+gnome-keyring
+libsecret
+neovim
+micro
+code
 
 # Fonts & Visual Themes
 ttf-jetbrains-mono-nerd
 ttf-fira-code
+ttf-liberation
 noto-fonts
 noto-fonts-emoji
 noto-fonts-cjk
 papirus-icon-theme
 breeze-gtk
+breeze-icons
+qt5ct
+qt6ct
 
-# Text Editing & Utilities
-neovim
-micro
-firefox
+# Power Management, Printing & Containers
+power-profiles-daemon
+upower
+acpi
+tlp
+ufw
+flatpak
+docker
+docker-compose
+arch-install-scripts
 archinstall
+sudo

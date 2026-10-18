@@ -1,0 +1,11 @@
+root:x:0:root
+wheel:x:998:live
+audio:x:995:live
+video:x:986:live
+input:x:994:live
+storage:x:988:live
+optical:x:990:live
+network:x:90:live
+lp:x:991:live
+power:x:98:live
+live:x:1000:

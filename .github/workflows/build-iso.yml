@@ -27,7 +27,7 @@ jobs:
             set -euo pipefail
 
             echo '==> Updating Arch repositories and installing build tools...'
-            pacman -Syu --noconfirm archiso base-devel git sudo
+            pacman -Syu --noconfirm archiso base-devel git sudo imagemagick
 
             echo '==> Preparing isolated ISO build workspace...'
             cp -r /workspace /tmp/iso-profile
@@ -36,6 +36,26 @@ jobs:
             cp -rn /usr/share/archiso/configs/releng/syslinux /tmp/iso-profile/
             cp -rn /usr/share/archiso/configs/releng/efiboot /tmp/iso-profile/
             cp -rn /usr/share/archiso/configs/releng/grub /tmp/iso-profile/ || true
+
+            echo '==> Generating KryptonOS Catppuccin Mocha 4K Wallpaper...'
+            mkdir -p /tmp/iso-profile/airootfs/usr/share/backgrounds/krypton
+            magick -size 3840x2160 gradient:'#1e1e2e-#11111b' \
+              -fill '#cba6f7' -draw 'circle 1920,1080 1920,680' \
+              -blur 0x120 \
+              /tmp/iso-profile/airootfs/usr/share/backgrounds/krypton/wallpaper.png
+
+            echo '==> Populating live user home directory (/home/live) from /etc/skel...'
+            mkdir -p /tmp/iso-profile/airootfs/home/live
+            cp -r /tmp/iso-profile/airootfs/etc/skel/. /tmp/iso-profile/airootfs/home/live/
+
+            echo '==> Enabling Daily-Driver systemd services (SDDM, NetworkManager, Bluetooth, Power)...'
+            mkdir -p /tmp/iso-profile/airootfs/etc/systemd/system/multi-user.target.wants
+            mkdir -p /tmp/iso-profile/airootfs/etc/systemd/system/graphical.target.wants
+            ln -sf /usr/lib/systemd/system/sddm.service /tmp/iso-profile/airootfs/etc/systemd/system/display-manager.service
+            ln -sf /usr/lib/systemd/system/NetworkManager.service /tmp/iso-profile/airootfs/etc/systemd/system/multi-user.target.wants/NetworkManager.service
+            ln -sf /usr/lib/systemd/system/bluetooth.service /tmp/iso-profile/airootfs/etc/systemd/system/multi-user.target.wants/bluetooth.service
+            ln -sf /usr/lib/systemd/system/power-profiles-daemon.service /tmp/iso-profile/airootfs/etc/systemd/system/multi-user.target.wants/power-profiles-daemon.service
+            ln -sf /usr/lib/systemd/system/systemd-timesyncd.service /tmp/iso-profile/airootfs/etc/systemd/system/sysinit.target.wants/systemd-timesyncd.service || true
 
             echo '==> Setting up non-root build user for makepkg...'
             useradd -m -G wheel builder

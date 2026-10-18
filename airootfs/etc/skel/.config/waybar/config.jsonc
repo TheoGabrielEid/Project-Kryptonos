@@ -79,7 +79,7 @@
     },
     "custom/power": {
         "format": " ",
-        "on-click": "wlogout || rofi -show p -modi p:rofi-power-menu",
+        "on-click": "/usr/local/bin/krypton-powermenu",
         "tooltip": false
     }
 }
