@@ -31,9 +31,9 @@ THEMES = {
         "card": "#181825",
         "text": "#cdd6f4",
         "inactive_border": "#313244",
-        "wallpaper": "/usr/share/backgrounds/krypton/anime/lofi-study.png",
-        "wallpaper_name": "Lofi Night Study",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/lofi-study.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/anime/catppuccin-samurai.jpg",
+        "wallpaper_name": "Catppuccin Ronin Samurai",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/catppuccin-samurai.png",
         "terminal": {
             "foreground": "#cdd6f4",
             "background": "#1e1e2e",
@@ -53,9 +53,9 @@ THEMES = {
         "card": "#16161e",
         "text": "#c0caf5",
         "inactive_border": "#292e42",
-        "wallpaper": "/usr/share/backgrounds/krypton/anime/cyber-samurai.png",
-        "wallpaper_name": "Neo-Tokyo Cyber Samurai",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/cyber-samurai.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/anime/akihabara-night.jpg",
+        "wallpaper_name": "Akihabara Electric Town",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/akihabara-neon-night.png",
         "terminal": {
             "foreground": "#c0caf5",
             "background": "#1a1b26",
@@ -75,9 +75,9 @@ THEMES = {
         "card": "#242933",
         "text": "#eceff4",
         "inactive_border": "#434c5e",
-        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.jpg",
         "wallpaper_name": "Arctic Aurora Borealis",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora.png",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora-5k.png",
         "terminal": {
             "foreground": "#eceff4",
             "background": "#2e3440",
@@ -97,9 +97,9 @@ THEMES = {
         "card": "#1e1f29",
         "text": "#f8f8f2",
         "inactive_border": "#44475a",
-        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/interstellar-astronaut.png",
-        "wallpaper_name": "Interstellar Cosmic Explorer",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/interstellar-astronaut.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/cosmic-cliffs.jpg",
+        "wallpaper_name": "Cosmic Cliffs (NASA Webb)",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/cosmic-cliffs-webb.png",
         "terminal": {
             "foreground": "#f8f8f2",
             "background": "#282a36",
@@ -119,9 +119,9 @@ THEMES = {
         "card": "#050608",
         "text": "#e0f8ff",
         "inactive_border": "#21283b",
-        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/cyberpunk-noir.png",
-        "wallpaper_name": "Blade Runner Neo-Noir",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/cyberpunk-noir.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/hong-kong-skyline.jpg",
+        "wallpaper_name": "Hong Kong Blade Runner Night",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/hong-kong-skyline.png",
         "terminal": {
             "foreground": "#e0f8ff",
             "background": "#0c0e14",
@@ -141,9 +141,9 @@ THEMES = {
         "card": "#1d2021",
         "text": "#ebdbb2",
         "inactive_border": "#3c3836",
-        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/desert-dunes.png",
-        "wallpaper_name": "Golden Desert Horizon",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/desert-dunes.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/badlands-canyon.jpg",
+        "wallpaper_name": "Badlands Canyon Sunset",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/badlands-canyon.png",
         "terminal": {
             "foreground": "#ebdbb2",
             "background": "#282828",
@@ -163,9 +163,9 @@ THEMES = {
         "card": "#030604",
         "text": "#d4ffe6",
         "inactive_border": "#132b1e",
-        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/emerald-matrix.png",
-        "wallpaper_name": "Matrix Cyberspace",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/emerald-matrix.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/dolomites-braies.jpg",
+        "wallpaper_name": "Lago di Braies Dolomites",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/dolomites-braies.png",
         "terminal": {
             "foreground": "#d4ffe6",
             "background": "#080d0a",
@@ -185,9 +185,9 @@ THEMES = {
         "card": "#1f1d2e",
         "text": "#e0def4",
         "inactive_border": "#26233a",
-        "wallpaper": "/usr/share/backgrounds/krypton/anime/sakura-fuji.png",
-        "wallpaper_name": "Sakura Mount Fuji",
-        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-fuji.png",
+        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/sakura-fuji.jpg",
+        "wallpaper_name": "Mount Fuji Sakura Spring",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-mount-fuji.png",
         "terminal": {
             "foreground": "#e0def4",
             "background": "#191724",
@@ -249,78 +249,6 @@ def load_wallpapers_catalog():
     # Fallback default items
     return [
         {
-            "id": "lofi-study",
-            "name": "Lofi Night Study",
-            "category": "anime",
-            "category_label": "Anime Aesthetic",
-            "file": "/usr/share/backgrounds/krypton/anime/lofi-study.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/lofi-study.png",
-            "desc": "Warm anime study desk with steaming tea, code, and rain outside."
-        },
-        {
-            "id": "cyber-samurai",
-            "name": "Neo-Tokyo Cyber Samurai",
-            "category": "anime",
-            "category_label": "Anime & Characters",
-            "file": "/usr/share/backgrounds/krypton/anime/cyber-samurai.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/cyber-samurai.png",
-            "desc": "Futuristic ronin warrior looking over neon-lit skyscraper holograms."
-        },
-        {
-            "id": "sakura-fuji",
-            "name": "Sakura Mount Fuji",
-            "category": "anime",
-            "category_label": "Anime Aesthetic",
-            "file": "/usr/share/backgrounds/krypton/anime/sakura-fuji.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-fuji.png",
-            "desc": "Delicate cherry blossoms and glowing lanterns at twilight."
-        },
-        {
-            "id": "nordic-aurora",
-            "name": "Arctic Aurora Borealis",
-            "category": "landscape",
-            "category_label": "Landscape",
-            "file": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora.png",
-            "desc": "Emerald mountain lake reflecting vibrant northern lights."
-        },
-        {
-            "id": "desert-dunes",
-            "name": "Golden Desert Horizon",
-            "category": "landscape",
-            "category_label": "Landscape",
-            "file": "/usr/share/backgrounds/krypton/landscapes/desert-dunes.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/desert-dunes.png",
-            "desc": "Serene rolling dunes with warm violet and amber sunset."
-        },
-        {
-            "id": "interstellar-astronaut",
-            "name": "Interstellar Cosmic Explorer",
-            "category": "cinematic",
-            "category_label": "Movie & Characters",
-            "file": "/usr/share/backgrounds/krypton/cinematic/interstellar-astronaut.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/interstellar-astronaut.png",
-            "desc": "Sci-fi explorer standing before an immense cosmic nebula."
-        },
-        {
-            "id": "cyberpunk-noir",
-            "name": "Blade Runner Neo-Noir",
-            "category": "cinematic",
-            "category_label": "Movie & Cinema",
-            "file": "/usr/share/backgrounds/krypton/cinematic/cyberpunk-noir.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/cyberpunk-noir.png",
-            "desc": "Rain-slicked neon street with holographic advertisements."
-        },
-        {
-            "id": "emerald-matrix",
-            "name": "Matrix Cyberspace",
-            "category": "cinematic",
-            "category_label": "Movie & Cinema",
-            "file": "/usr/share/backgrounds/krypton/cinematic/emerald-matrix.png",
-            "thumb": "/usr/share/backgrounds/krypton/thumbs/emerald-matrix.png",
-            "desc": "Phosphor green digital matrix stream and cyberspace code."
-        },
-        {
             "id": "krypton-shield",
             "name": "Krypton Crystal Shield",
             "category": "minimal",
@@ -328,6 +256,132 @@ def load_wallpapers_catalog():
             "file": "/usr/share/backgrounds/krypton/minimal/krypton-default.png",
             "thumb": "/usr/share/backgrounds/krypton/thumbs/krypton-default.png",
             "desc": "Signature KryptonOS geometric crystal shield on mocha navy."
+        },
+        {
+            "id": "dolomites-braies",
+            "name": "Lago di Braies Dolomites",
+            "category": "landscape",
+            "category_label": "Landscape Photo",
+            "file": "/usr/share/backgrounds/krypton/landscapes/dolomites-braies.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/dolomites-braies.png",
+            "desc": "Authentic 4K alpine lake reflection beneath towering Dolomite limestone peaks."
+        },
+        {
+            "id": "sakura-mount-fuji",
+            "name": "Mount Fuji Sakura Spring",
+            "category": "landscape",
+            "category_label": "Landscape Photo",
+            "file": "/usr/share/backgrounds/krypton/landscapes/sakura-fuji.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-mount-fuji.png",
+            "desc": "Spring cherry blossoms framing Mount Fuji across Lake Kawaguchiko."
+        },
+        {
+            "id": "badlands-canyon",
+            "name": "Badlands Canyon Sunset",
+            "category": "landscape",
+            "category_label": "Landscape Photo",
+            "file": "/usr/share/backgrounds/krypton/landscapes/badlands-canyon.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/badlands-canyon.png",
+            "desc": "Authentic 6.7K sunset photography of rugged canyon gorges in golden amber light."
+        },
+        {
+            "id": "nordic-aurora-5k",
+            "name": "Arctic Aurora Borealis",
+            "category": "landscape",
+            "category_label": "Landscape Photo",
+            "file": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora-5k.png",
+            "desc": "Vivid 5K emerald and violet northern lights dancing across glacial mountain waters."
+        },
+        {
+            "id": "akihabara-neon-night",
+            "name": "Akihabara Electric Town",
+            "category": "anime",
+            "category_label": "Tokyo & Anime",
+            "file": "/usr/share/backgrounds/krypton/anime/akihabara-night.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/akihabara-neon-night.png",
+            "desc": "Authentic Tokyo electric district illuminated by vibrant neon billboards and anime marquees."
+        },
+        {
+            "id": "spiderman-miles",
+            "name": "Spider-Man: Miles Morales",
+            "category": "anime",
+            "category_label": "Movie Characters",
+            "file": "/usr/share/backgrounds/krypton/anime/spiderman-miles.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/spiderman-miles.png",
+            "desc": "High-resolution Into the Spider-Verse character artwork diving over neon skyline."
+        },
+        {
+            "id": "japan-rain-alley",
+            "name": "Tokyo Rain Lantern Alley",
+            "category": "anime",
+            "category_label": "Anime Aesthetic",
+            "file": "/usr/share/backgrounds/krypton/anime/japan-rain-alley.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/japan-rain-alley.png",
+            "desc": "Cozy Kyoto/Tokyo stone alleyway in gentle rain with warm glowing lanterns."
+        },
+        {
+            "id": "catppuccin-samurai",
+            "name": "Catppuccin Ronin Samurai",
+            "category": "anime",
+            "category_label": "Anime & Characters",
+            "file": "/usr/share/backgrounds/krypton/anime/catppuccin-samurai.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/catppuccin-samurai.png",
+            "desc": "Hand-drawn wandering ronin samurai warrior with katana in lavender mist."
+        },
+        {
+            "id": "totoro-sunflowers",
+            "name": "Totoro Sunflowers Field",
+            "category": "anime",
+            "category_label": "Anime Aesthetic",
+            "file": "/usr/share/backgrounds/krypton/anime/totoro-sunflowers.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/totoro-sunflowers.png",
+            "desc": "Whimsical Studio Ghibli countryside sunflower meadow with Totoro."
+        },
+        {
+            "id": "cosmic-cliffs-webb",
+            "name": "Cosmic Cliffs (NASA Webb)",
+            "category": "cinematic",
+            "category_label": "NASA Deep Space",
+            "file": "/usr/share/backgrounds/krypton/cinematic/cosmic-cliffs.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/cosmic-cliffs-webb.png",
+            "desc": "Official NASA James Webb Space Telescope 11K composite of the Carina Nebula."
+        },
+        {
+            "id": "pillars-of-creation",
+            "name": "Pillars of Creation (NASA Webb)",
+            "category": "cinematic",
+            "category_label": "NASA Deep Space",
+            "file": "/usr/share/backgrounds/krypton/cinematic/pillars-creation.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/pillars-of-creation.png",
+            "desc": "Official NASA James Webb NIRCam infrared deep space view of Eagle Nebula."
+        },
+        {
+            "id": "hong-kong-skyline",
+            "name": "Hong Kong Blade Runner Night",
+            "category": "cinematic",
+            "category_label": "Movie & Cinema",
+            "file": "/usr/share/backgrounds/krypton/cinematic/hong-kong-skyline.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/hong-kong-skyline.png",
+            "desc": "Panoramic night photography of Victoria Harbour with towering glowing neon skyscrapers."
+        },
+        {
+            "id": "deep-space-astronaut",
+            "name": "Deep Space Astronaut",
+            "category": "cinematic",
+            "category_label": "Movie & Cinema",
+            "file": "/usr/share/backgrounds/krypton/cinematic/deep-space-astronaut.jpg",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/deep-space-astronaut.png",
+            "desc": "Interstellar space traveler standing on the precipice of cosmic eternity."
+        },
+        {
+            "id": "catppuccin-minimal-valley",
+            "name": "Catppuccin Minimal Valley",
+            "category": "minimal",
+            "category_label": "Minimal & Art",
+            "file": "/usr/share/backgrounds/krypton/minimal/catppuccin-valley.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/catppuccin-minimal-valley.png",
+            "desc": "Clean 4K vector illustration of layered mountains in soothing pastel hues."
         }
     ]
 
