@@ -373,9 +373,13 @@ def load_current_theme():
 
 
 def apply_wallpaper(wall_path):
-    if not wall_path or not os.path.exists(wall_path):
+    if not wall_path:
         return
     try:
+        wall_file = os.path.expanduser("~/.config/hypr/.current_wallpaper")
+        os.makedirs(os.path.dirname(wall_file), exist_ok=True)
+        with open(wall_file, "w", encoding="utf-8") as f:
+            f.write(wall_path + "\n")
         subprocess.run(["/usr/local/bin/krypton-wallpaper", wall_path], check=False)
     except Exception:
         pass

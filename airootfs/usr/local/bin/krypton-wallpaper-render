@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 """
-KryptonOS Wayland Background Layer Renderer (GTK 3.0 + GtkLayerShell 0.1 + GdkPixbuf)
-Draws the desktop wallpaper on the Wayland BACKGROUND layer using Cairo (CPU/SHM),
-which works 100% reliably on VMware svga/vmwgfx where hyprpaper's GLES3.0 shader fails.
+KryptonOS Wayland Background Layer Renderer Daemon (GTK 3.0 + GtkLayerShell 0.1 + Cairo)
+Draws the desktop wallpaper on the Wayland BACKGROUND layer using Cairo (CPU/SHM).
+Supports dynamic live wallpaper switching via SIGUSR1 or monitoring ~/.config/hypr/.current_wallpaper.
+Works 100% reliably on all GPUs (VMware svga/vmwgfx, Intel, AMD, NVIDIA).
 """
+import math
 import os
+import signal
 import sys
 import gi
 
@@ -12,16 +15,22 @@ gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 gi.require_version("GtkLayerShell", "0.1")
-from gi.repository import Gtk, Gdk, GdkPixbuf, GtkLayerShell
+from gi.repository import Gtk, Gdk, GdkPixbuf, GtkLayerShell, GLib
 
 
 class WallpaperLayerWindow(Gtk.Window):
-    def __init__(self, image_path):
+    def __init__(self, initial_path):
         super().__init__()
-        self.image_path = image_path
-        self.pixbuf = GdkPixbuf.Pixbuf.new_from_file(image_path)
+        self.image_path = None
+        self.pixbuf = None
         self.scaled_cache = {}
+        self.wall_file = os.path.expanduser("~/.config/hypr/.current_wallpaper")
+        self.last_mtime = 0
 
+        # Load initial wallpaper
+        self.load_wallpaper(initial_path)
+
+        # Configure Wayland Background Layer
         GtkLayerShell.init_for_window(self)
         GtkLayerShell.set_layer(self, GtkLayerShell.Layer.BACKGROUND)
         GtkLayerShell.set_namespace(self, "krypton-wallpaper")
@@ -38,35 +47,91 @@ class WallpaperLayerWindow(Gtk.Window):
         self.set_app_paintable(True)
         self.connect("draw", self.on_draw)
 
+        # Monitor current_wallpaper file every 500ms for instant live updates
+        GLib.timeout_add(500, self.check_wallpaper_file)
+
+    def load_wallpaper(self, path):
+        if not path or not os.path.exists(path):
+            return False
+        try:
+            new_pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
+            self.pixbuf = new_pixbuf
+            self.image_path = path
+            self.scaled_cache.clear()
+            self.queue_draw()
+            return True
+        except Exception as e:
+            sys.stderr.write(f"KryptonWallpaper: Failed to load {path}: {e}\n")
+            return False
+
+    def check_wallpaper_file(self):
+        if os.path.exists(self.wall_file):
+            try:
+                mtime = os.path.getmtime(self.wall_file)
+                if mtime != self.last_mtime:
+                    self.last_mtime = mtime
+                    with open(self.wall_file, "r", encoding="utf-8") as f:
+                        new_path = f.read().strip()
+                    if new_path and os.path.exists(new_path) and new_path != self.image_path:
+                        self.load_wallpaper(new_path)
+            except Exception:
+                pass
+        return True  # Keep timeout active
+
+    def reload_from_file(self):
+        self.check_wallpaper_file()
+
     def on_draw(self, widget, cr):
+        if not self.pixbuf:
+            cr.set_source_rgb(0.07, 0.07, 0.11)
+            cr.paint()
+            return True
+
         alloc = self.get_allocation()
         w = max(1, alloc.width)
         h = max(1, alloc.height)
         key = (w, h)
+
         if key not in self.scaled_cache:
             self.scaled_cache.clear()
-            # Aspect-fill (cover) scaling
-            iw = self.pixbuf.get_width()
-            ih = self.pixbuf.get_height()
+            iw = max(1, self.pixbuf.get_width())
+            ih = max(1, self.pixbuf.get_height())
             scale = max(w / iw, h / ih)
-            sw = max(w, int(iw * scale))
-            sh = max(h, int(ih * scale))
+            sw = max(w, int(math.ceil(iw * scale)))
+            sh = max(h, int(math.ceil(ih * scale)))
             scaled = self.pixbuf.scale_simple(sw, sh, GdkPixbuf.InterpType.BILINEAR)
             ox = max(0, (sw - w) // 2)
             oy = max(0, (sh - h) // 2)
-            sub = scaled.new_subpixbuf(ox, oy, w, h)
-            self.scaled_cache[key] = sub
+            self.scaled_cache[key] = (scaled, ox, oy)
 
-        Gdk.cairo_set_source_pixbuf(cr, self.scaled_cache[key], 0, 0)
+        scaled, ox, oy = self.scaled_cache[key]
+        cr.save()
+        cr.rectangle(0, 0, w, h)
+        cr.clip()
+        Gdk.cairo_set_source_pixbuf(cr, scaled, -ox, -oy)
         cr.paint()
+        cr.restore()
         return True
 
 
 def main():
     img_path = sys.argv[1] if len(sys.argv) > 1 else "/usr/share/backgrounds/krypton/krypton-default.png"
     if not os.path.exists(img_path):
-        sys.exit(0)
+        fallback = "/usr/share/backgrounds/krypton/wallpaper.png"
+        if os.path.exists(fallback):
+            img_path = fallback
+
     win = WallpaperLayerWindow(img_path)
+
+    # Handle SIGUSR1 for instantaneous signal-based reloads
+    def sig_handler(signum, frame):
+        GLib.idle_add(win.reload_from_file)
+
+    try:
+        signal.signal(signal.SIGUSR1, sig_handler)
+    except Exception:
+        pass
+
     win.show_all()
     Gtk.main()
 

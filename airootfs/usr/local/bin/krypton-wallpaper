@@ -1,24 +1,34 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KryptonOS Desktop Wallpaper Daemon (GtkLayerShell + Fallback)
-# Works on ALL GPUs (Mesa svga, vmwgfx, Intel, AMD, NVIDIA)
+# KryptonOS Desktop Wallpaper Controller & Daemon Launcher
+# Usage: krypton-wallpaper [path_to_image]
 # ==============================================================================
-WALL="${1:-/usr/share/backgrounds/krypton/krypton-default.png}"
-if [ ! -f "$WALL" ]; then
-    WALL="/usr/share/backgrounds/krypton/wallpaper.png"
+TARGET="$1"
+
+if [ -z "$TARGET" ]; then
+    if [ -f "$HOME/.config/hypr/.current_wallpaper" ]; then
+        TARGET=$(cat "$HOME/.config/hypr/.current_wallpaper" | tr -d '\r\n')
+    fi
+fi
+
+if [ -z "$TARGET" ] || [ ! -f "$TARGET" ]; then
+    if [ -f "/usr/share/backgrounds/krypton/anime/lofi-study.png" ]; then
+        TARGET="/usr/share/backgrounds/krypton/anime/lofi-study.png"
+    elif [ -f "/usr/share/backgrounds/krypton/krypton-default.png" ]; then
+        TARGET="/usr/share/backgrounds/krypton/krypton-default.png"
+    elif [ -f "/usr/share/backgrounds/krypton/wallpaper.png" ]; then
+        TARGET="/usr/share/backgrounds/krypton/wallpaper.png"
+    fi
 fi
 
 mkdir -p "$HOME/.config/hypr"
-echo "$WALL" > "$HOME/.config/hypr/.current_wallpaper"
+echo "$TARGET" > "$HOME/.config/hypr/.current_wallpaper"
 
-pkill -f "krypton-wallpaper-render" 2>/dev/null || true
-killall hyprpaper 2>/dev/null || true
-
-# Try GTK Layer Shell Python renderer first
-python3 /usr/local/bin/krypton-wallpaper-render "$WALL" >/tmp/krypton-wall.log 2>&1 &
-PID=$!
-sleep 0.5
-if ! kill -0 $PID 2>/dev/null; then
-    # Fallback to hyprpaper
-    hyprpaper >/dev/null 2>&1 &
+# If daemon is already running, send SIGUSR1 for instant live switch
+if pgrep -f "krypton-wallpaper-render" >/dev/null 2>&1; then
+    pkill -SIGUSR1 -f "krypton-wallpaper-render" 2>/dev/null || true
+else
+    # Start daemon
+    killall hyprpaper 2>/dev/null || true
+    python3 /usr/local/bin/krypton-wallpaper-render "$TARGET" >/tmp/krypton-wall.log 2>&1 &
 fi
