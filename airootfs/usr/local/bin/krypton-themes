@@ -1,0 +1,793 @@
+#!/usr/bin/env python3
+"""
+KryptonOS Theme Studio & Customizer (GTK 3.0)
+Allows choosing preset developer themes or crafting custom desktop themes.
+Live updates Hyprland, Waybar, Kitty Terminal, Dock, and Wallpapers.
+"""
+import json
+import os
+import subprocess
+import sys
+
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gtk, Gdk, GLib
+
+THEMES = {
+    "catppuccin": {
+        "name": "Catppuccin Mocha",
+        "description": "Signature Krypton look: Cyber lavender & sapphire over deep mocha.",
+        "accent": "#cba6f7",
+        "secondary": "#89b4fa",
+        "bg": "#1e1e2e",
+        "card": "#181825",
+        "text": "#cdd6f4",
+        "inactive_border": "#313244",
+        "terminal": {
+            "foreground": "#cdd6f4",
+            "background": "#1e1e2e",
+            "cursor": "#f5e0dc",
+            "selection_bg": "#f5e0dc",
+            "selection_fg": "#1e1e2e",
+            "active_tab_bg": "#cba6f7",
+            "active_tab_fg": "#11111b",
+        }
+    },
+    "tokyo-night": {
+        "name": "Tokyo Night",
+        "description": "Electric cyberpunk night: Neon cyan & violet over dark storm blue.",
+        "accent": "#7aa2f7",
+        "secondary": "#bb9af7",
+        "bg": "#1a1b26",
+        "card": "#16161e",
+        "text": "#c0caf5",
+        "inactive_border": "#292e42",
+        "terminal": {
+            "foreground": "#c0caf5",
+            "background": "#1a1b26",
+            "cursor": "#c0caf5",
+            "selection_bg": "#283457",
+            "selection_fg": "#c0caf5",
+            "active_tab_bg": "#7aa2f7",
+            "active_tab_fg": "#1a1b26",
+        }
+    },
+    "nord": {
+        "name": "Nord Arctic",
+        "description": "Clean arctic minimalism: Glacial frost and polar cyan over deep slate.",
+        "accent": "#88c0d0",
+        "secondary": "#81a1c1",
+        "bg": "#2e3440",
+        "card": "#242933",
+        "text": "#eceff4",
+        "inactive_border": "#434c5e",
+        "terminal": {
+            "foreground": "#eceff4",
+            "background": "#2e3440",
+            "cursor": "#d8dee9",
+            "selection_bg": "#434c5e",
+            "selection_fg": "#eceff4",
+            "active_tab_bg": "#88c0d0",
+            "active_tab_fg": "#2e3440",
+        }
+    },
+    "dracula": {
+        "name": "Dracula Pro",
+        "description": "Vibrant dark mode: Gothic vampire purple with hot neon pink accents.",
+        "accent": "#bd93f9",
+        "secondary": "#ff79c6",
+        "bg": "#282a36",
+        "card": "#1e1f29",
+        "text": "#f8f8f2",
+        "inactive_border": "#44475a",
+        "terminal": {
+            "foreground": "#f8f8f2",
+            "background": "#282a36",
+            "cursor": "#f8f8f2",
+            "selection_bg": "#44475a",
+            "selection_fg": "#f8f8f2",
+            "active_tab_bg": "#bd93f9",
+            "active_tab_fg": "#282a36",
+        }
+    },
+    "cyberpunk": {
+        "name": "Cyberpunk 2077",
+        "description": "High voltage aesthetic: Electric neon yellow and radioactive teal.",
+        "accent": "#fcee0a",
+        "secondary": "#00f0ff",
+        "bg": "#0c0e14",
+        "card": "#050608",
+        "text": "#e0f8ff",
+        "inactive_border": "#21283b",
+        "terminal": {
+            "foreground": "#e0f8ff",
+            "background": "#0c0e14",
+            "cursor": "#fcee0a",
+            "selection_bg": "#00f0ff",
+            "selection_fg": "#0c0e14",
+            "active_tab_bg": "#fcee0a",
+            "active_tab_fg": "#0c0e14",
+        }
+    },
+    "gruvbox": {
+        "name": "Gruvbox Dark",
+        "description": "Retro warmth: Golden sand, terracotta amber, and earthy dark tones.",
+        "accent": "#fabd2f",
+        "secondary": "#fe8019",
+        "bg": "#282828",
+        "card": "#1d2021",
+        "text": "#ebdbb2",
+        "inactive_border": "#3c3836",
+        "terminal": {
+            "foreground": "#ebdbb2",
+            "background": "#282828",
+            "cursor": "#fabd2f",
+            "selection_bg": "#504945",
+            "selection_fg": "#ebdbb2",
+            "active_tab_bg": "#fabd2f",
+            "active_tab_fg": "#282828",
+        }
+    },
+    "emerald": {
+        "name": "Emerald Matrix",
+        "description": "Hacker terminal: Luminous phosphor green and laser cyan on abyss black.",
+        "accent": "#00ff9f",
+        "secondary": "#00b8ff",
+        "bg": "#080d0a",
+        "card": "#030604",
+        "text": "#d4ffe6",
+        "inactive_border": "#132b1e",
+        "terminal": {
+            "foreground": "#d4ffe6",
+            "background": "#080d0a",
+            "cursor": "#00ff9f",
+            "selection_bg": "#00ff9f",
+            "selection_fg": "#080d0a",
+            "active_tab_bg": "#00ff9f",
+            "active_tab_fg": "#080d0a",
+        }
+    },
+    "rose-pine": {
+        "name": "Rosé Pine",
+        "description": "Soothing warmth: Muted vintage rose, golden pine, and dusky lavender.",
+        "accent": "#ebbcba",
+        "secondary": "#9ccfd8",
+        "bg": "#191724",
+        "card": "#1f1d2e",
+        "text": "#e0def4",
+        "inactive_border": "#26233a",
+        "terminal": {
+            "foreground": "#e0def4",
+            "background": "#191724",
+            "cursor": "#524f67",
+            "selection_bg": "#2a283e",
+            "selection_fg": "#e0def4",
+            "active_tab_bg": "#ebbcba",
+            "active_tab_fg": "#191724",
+        }
+    }
+}
+
+SWATCH_COLORS = [
+    ("#cba6f7", "Lavender"),
+    ("#89b4fa", "Sapphire"),
+    ("#7aa2f7", "Electric Blue"),
+    ("#00f0ff", "Neon Cyan"),
+    ("#00ff9f", "Emerald"),
+    ("#fabd2f", "Gold"),
+    ("#fe8019", "Orange"),
+    ("#ff79c6", "Pink"),
+    ("#ebbcba", "Rose"),
+    ("#f38ba8", "Red"),
+    ("#cdd6f4", "White"),
+]
+
+BG_PRESETS = [
+    ("#1e1e2e", "Mocha Navy"),
+    ("#1a1b26", "Tokyo Storm"),
+    ("#282a36", "Dracula Slate"),
+    ("#2e3440", "Nord Polar"),
+    ("#191724", "Pine Dusky"),
+    ("#11111b", "Deep Midnight"),
+    ("#000000", "Pitch Void Black"),
+]
+
+CONFIG_DIR = os.path.expanduser("~/.config/krypton")
+THEME_STATE_FILE = os.path.join(CONFIG_DIR, "current_theme.json")
+
+
+def hex_to_rgb(hex_str):
+    hex_clean = hex_str.lstrip("#")
+    if len(hex_clean) == 3:
+        hex_clean = "".join([c*2 for c in hex_clean])
+    return int(hex_clean[0:2], 16), int(hex_clean[2:4], 16), int(hex_clean[4:6], 16)
+
+
+def hex_clean(hex_str):
+    return hex_str.lstrip("#")
+
+
+def load_current_theme():
+    if os.path.exists(THEME_STATE_FILE):
+        try:
+            with open(THEME_STATE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # default
+    return {
+        "id": "catppuccin",
+        "name": "Catppuccin Mocha",
+        "accent": "#cba6f7",
+        "secondary": "#89b4fa",
+        "bg": "#1e1e2e",
+        "card": "#181825",
+        "text": "#cdd6f4",
+        "inactive_border": "#313244",
+        "rounding": 10,
+        "border_size": 2,
+        "gaps_in": 6,
+        "gaps_out": 12,
+        "active_opacity": 1.0,
+        "inactive_opacity": 0.95,
+        "generate_wallpaper": False,
+    }
+
+
+def save_and_apply_theme(theme_data):
+    os.makedirs(CONFIG_DIR, exist_ok=True)
+    with open(THEME_STATE_FILE, "w", encoding="utf-8") as f:
+        json.dump(theme_data, f, indent=2)
+
+    accent_clean = hex_clean(theme_data["accent"])
+    sec_clean = hex_clean(theme_data.get("secondary", theme_data["accent"]))
+    inactive_clean = hex_clean(theme_data.get("inactive_border", "#313244"))
+    rounding = int(theme_data.get("rounding", 10))
+    border_size = int(theme_data.get("border_size", 2))
+    gaps_in = int(theme_data.get("gaps_in", 6))
+    gaps_out = int(theme_data.get("gaps_out", 12))
+    active_opacity = float(theme_data.get("active_opacity", 1.0))
+    inactive_opacity = float(theme_data.get("inactive_opacity", 0.95))
+
+    # 1. Update Hyprland in real-time
+    try:
+        subprocess.run(["hyprctl", "keyword", "general:col.active_border", f"rgba({accent_clean}ee) rgba({sec_clean}ee) 45deg"], check=False)
+        subprocess.run(["hyprctl", "keyword", "general:col.inactive_border", f"rgba({inactive_clean}aa)"], check=False)
+        subprocess.run(["hyprctl", "keyword", "general:border_size", str(border_size)], check=False)
+        subprocess.run(["hyprctl", "keyword", "general:gaps_in", str(gaps_in)], check=False)
+        subprocess.run(["hyprctl", "keyword", "general:gaps_out", str(gaps_out)], check=False)
+        subprocess.run(["hyprctl", "keyword", "decoration:rounding", str(rounding)], check=False)
+        subprocess.run(["hyprctl", "keyword", "decoration:active_opacity", str(active_opacity)], check=False)
+        subprocess.run(["hyprctl", "keyword", "decoration:inactive_opacity", str(inactive_opacity)], check=False)
+    except Exception:
+        pass
+
+    # Save Hyprland theme file persistently
+    hypr_dir = os.path.expanduser("~/.config/hypr")
+    os.makedirs(hypr_dir, exist_ok=True)
+    theme_conf = os.path.join(hypr_dir, "theme.conf")
+    with open(theme_conf, "w", encoding="utf-8") as f:
+        f.write(f"""# KryptonOS Active Theme (Generated by Theme Studio)
+general {{
+    gaps_in = {gaps_in}
+    gaps_out = {gaps_out}
+    border_size = {border_size}
+    col.active_border = rgba({accent_clean}ee) rgba({sec_clean}ee) 45deg
+    col.inactive_border = rgba({inactive_clean}aa)
+}}
+
+decoration {{
+    rounding = {rounding}
+    active_opacity = {active_opacity}
+    inactive_opacity = {inactive_opacity}
+}}
+""")
+
+    # 2. Update Waybar
+    waybar_dir = os.path.expanduser("~/.config/waybar")
+    os.makedirs(waybar_dir, exist_ok=True)
+    colors_css = os.path.join(waybar_dir, "colors.css")
+    bg_r, bg_g, bg_b = hex_to_rgb(theme_data["bg"])
+    acc_r, acc_g, acc_b = hex_to_rgb(theme_data["accent"])
+    with open(colors_css, "w", encoding="utf-8") as f:
+        f.write(f"""/* Generated by KryptonOS Theme Studio */
+@define-color theme_bg rgba({bg_r}, {bg_g}, {bg_b}, 0.88);
+@define-color theme_accent {theme_data["accent"]};
+@define-color theme_secondary {theme_data.get("secondary", theme_data["accent"])};
+@define-color theme_text {theme_data.get("text", "#cdd6f4")};
+@define-color theme_border rgba({acc_r}, {acc_g}, {acc_b}, 0.35);
+@define-color theme_card {theme_data.get("card", "#181825")};
+""")
+    try:
+        subprocess.run(["pkill", "-SIGUSR2", "waybar"], check=False)
+    except Exception:
+        pass
+
+    # 3. Update Kitty Terminal Theme
+    kitty_dir = os.path.expanduser("~/.config/kitty")
+    os.makedirs(kitty_dir, exist_ok=True)
+    kitty_theme_file = os.path.join(kitty_dir, "theme.conf")
+    t_conf = theme_data.get("terminal", {})
+    t_fg = t_conf.get("foreground", theme_data.get("text", "#cdd6f4"))
+    t_bg = t_conf.get("background", theme_data.get("bg", "#1e1e2e"))
+    t_cur = t_conf.get("cursor", theme_data["accent"])
+    t_sel_bg = t_conf.get("selection_bg", theme_data["accent"])
+    t_sel_fg = t_conf.get("selection_fg", t_bg)
+    t_tab_bg = t_conf.get("active_tab_bg", theme_data["accent"])
+    t_tab_fg = t_conf.get("active_tab_fg", "#11111b")
+
+    with open(kitty_theme_file, "w", encoding="utf-8") as f:
+        f.write(f"""# Generated by KryptonOS Theme Studio
+foreground              {t_fg}
+background              {t_bg}
+selection_foreground    {t_sel_fg}
+selection_background    {t_sel_bg}
+cursor                  {t_cur}
+cursor_text_color       {t_bg}
+active_tab_foreground   {t_tab_fg}
+active_tab_background   {t_tab_bg}
+active_border_color     {theme_data["accent"]}
+inactive_border_color   {theme_data.get("inactive_border", "#313244")}
+url_color               {theme_data.get("secondary", "#89b4fa")}
+""")
+    try:
+        subprocess.run(["pkill", "-SIGUSR1", "kitty"], check=False)
+    except Exception:
+        pass
+
+    # 4. Optional Wallpaper gradient generation
+    if theme_data.get("generate_wallpaper", False):
+        try:
+            wall_path = os.path.expanduser("~/.cache/krypton-theme-wallpaper.png")
+            os.makedirs(os.path.dirname(wall_path), exist_ok=True)
+            acc = theme_data["accent"]
+            bg = theme_data["bg"]
+            subprocess.run([
+                "magick", "-size", "3840x2160",
+                f"radial-gradient:{acc}-{bg}",
+                wall_path
+            ], check=False)
+            # update hyprpaper / wallpaper
+            subprocess.run(["/usr/local/bin/krypton-wallpaper", wall_path], check=False)
+        except Exception:
+            pass
+
+    # 5. Notify user
+    try:
+        subprocess.run([
+            "notify-send",
+            "Theme Applied",
+            f"Activated '{theme_data.get('name', 'Custom Theme')}' across Hyprland, Waybar & Terminal.",
+            "--icon=preferences-desktop-theme",
+            "-u", "normal"
+        ], check=False)
+    except Exception:
+        pass
+
+
+class ThemeManagerWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Theme Studio")
+        self.set_default_size(940, 620)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_wmclass("krypton-themes", "krypton-themes")
+
+        self.current_theme = load_current_theme()
+
+        self.setup_header()
+        self.setup_ui()
+        self.apply_dark_css()
+
+    def setup_header(self):
+        header = Gtk.HeaderBar()
+        header.set_show_close_button(True)
+        header.props.title = "Krypton Theme Studio"
+        header.props.subtitle = "Desktop Aesthetic & Color Customizer"
+
+        apply_btn = Gtk.Button(label="  Apply Theme")
+        apply_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic", Gtk.IconSize.BUTTON)
+        apply_btn.set_image(apply_icon)
+        apply_btn.set_always_show_image(True)
+        apply_btn.get_style_context().add_class("suggested-action")
+        apply_btn.connect("clicked", self.on_apply_clicked)
+        header.pack_end(apply_btn)
+
+        self.set_titlebar(header)
+
+    def setup_ui(self):
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(main_box)
+
+        stack = Gtk.Stack()
+        stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        stack.set_transition_duration(200)
+
+        switcher = Gtk.StackSwitcher()
+        switcher.set_stack(stack)
+        switcher.set_halign(Gtk.Align.CENTER)
+        switcher.set_margin_top(12)
+        switcher.set_margin_bottom(12)
+        main_box.pack_start(switcher, False, False, 0)
+
+        # Tab 1: Presets
+        presets_widget = self.build_presets_tab()
+        stack.add_titled(presets_widget, "presets", "  Preset Themes  ")
+
+        # Tab 2: Custom Theme Studio
+        studio_widget = self.build_studio_tab()
+        stack.add_titled(studio_widget, "studio", "  Custom Studio  ")
+
+        # Tab 3: Desktop Metrics & Gaps
+        layout_widget = self.build_layout_tab()
+        stack.add_titled(layout_widget, "layout", "  Tiling & Gaps  ")
+
+        main_box.pack_start(stack, True, True, 0)
+
+    def build_presets_tab(self):
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        flow = Gtk.FlowBox()
+        flow.set_valign(Gtk.Align.START)
+        flow.set_max_children_per_line(2)
+        flow.set_min_children_per_line(2)
+        flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        flow.set_column_spacing(16)
+        flow.set_row_spacing(16)
+        flow.set_margin_left(20)
+        flow.set_margin_right(20)
+        flow.set_margin_top(10)
+        flow.set_margin_bottom(20)
+
+        for theme_id, t_info in THEMES.items():
+            card = self.create_theme_card(theme_id, t_info)
+            flow.add(card)
+
+        scroller.add(flow)
+        return scroller
+
+    def create_theme_card(self, theme_id, info):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.get_style_context().add_class("theme-card")
+        box.set_size_request(410, 160)
+
+        # Top title & select button
+        top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        title_label = Gtk.Label()
+        title_label.set_markup(f"<b><big>{info['name']}</big></b>")
+        title_label.set_halign(Gtk.Align.START)
+        top_row.pack_start(title_label, True, True, 0)
+
+        sel_btn = Gtk.Button(label="Activate")
+        sel_btn.connect("clicked", self.on_preset_activate, theme_id)
+        if self.current_theme.get("id") == theme_id:
+            sel_btn.set_label("Active ✓")
+            sel_btn.set_sensitive(False)
+            box.get_style_context().add_class("active-card")
+        top_row.pack_end(sel_btn, False, False, 0)
+        box.pack_start(top_row, False, False, 0)
+
+        # Description
+        desc_label = Gtk.Label(label=info["description"])
+        desc_label.set_line_wrap(True)
+        desc_label.set_max_width_chars(45)
+        desc_label.set_halign(Gtk.Align.START)
+        desc_label.get_style_context().add_class("dim-label")
+        box.pack_start(desc_label, False, False, 0)
+
+        # Color Swatches Preview Pill
+        swatches_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        swatches_box.set_halign(Gtk.Align.START)
+        swatches_box.set_margin_top(8)
+
+        colors_to_show = [
+            info["accent"],
+            info.get("secondary", info["accent"]),
+            info.get("text", "#ffffff"),
+            info.get("inactive_border", "#444444"),
+            info["bg"]
+        ]
+
+        for color_hex in colors_to_show:
+            sw = Gtk.DrawingArea()
+            sw.set_size_request(28, 28)
+            sw.connect("draw", self.draw_swatch_circle, color_hex)
+            swatches_box.pack_start(sw, False, False, 0)
+
+        box.pack_start(swatches_box, False, False, 0)
+        return box
+
+    def draw_swatch_circle(self, widget, cr, color_hex):
+        r, g, b = hex_to_rgb(color_hex)
+        cr.set_source_rgb(r / 255.0, g / 255.0, b / 255.0)
+        cr.arc(14, 14, 12, 0, 2 * 3.14159)
+        cr.fill_preserve()
+        cr.set_source_rgba(1.0, 1.0, 1.0, 0.2)
+        cr.set_line_width(1.5)
+        cr.stroke()
+        return False
+
+    def on_preset_activate(self, button, theme_id):
+        t_data = THEMES[theme_id].copy()
+        t_data["id"] = theme_id
+        # preserve current layout gaps & rounding preferences
+        t_data["rounding"] = self.current_theme.get("rounding", 10)
+        t_data["border_size"] = self.current_theme.get("border_size", 2)
+        t_data["gaps_in"] = self.current_theme.get("gaps_in", 6)
+        t_data["gaps_out"] = self.current_theme.get("gaps_out", 12)
+        t_data["active_opacity"] = self.current_theme.get("active_opacity", 1.0)
+        t_data["inactive_opacity"] = self.current_theme.get("inactive_opacity", 0.95)
+
+        self.current_theme = t_data
+        save_and_apply_theme(t_data)
+        # Refresh window UI to show new active card
+        self.rebuild_window()
+
+    def rebuild_window(self):
+        for child in self.get_children():
+            self.remove(child)
+        self.setup_ui()
+        self.show_all()
+
+    def build_studio_tab(self):
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=18)
+        vbox.set_margin_left(30)
+        vbox.set_margin_right(30)
+        vbox.set_margin_top(15)
+        vbox.set_margin_bottom(25)
+
+        # 1. Primary Accent Color
+        vbox.pack_start(self.make_section_title("1. Primary Accent Color", "Main highlight for active borders, active tabs, buttons and links."), False, False, 0)
+        accent_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        for hex_code, name in SWATCH_COLORS:
+            btn = Gtk.Button()
+            btn.set_tooltip_text(f"{name} ({hex_code})")
+            da = Gtk.DrawingArea()
+            da.set_size_request(32, 32)
+            da.connect("draw", self.draw_swatch_circle, hex_code)
+            btn.add(da)
+            btn.connect("clicked", self.set_accent_color, hex_code)
+            accent_box.pack_start(btn, False, False, 0)
+
+        # Custom Color Picker button
+        color_btn = Gtk.ColorButton()
+        r, g, b = hex_to_rgb(self.current_theme.get("accent", "#cba6f7"))
+        color_btn.set_rgba(Gdk.RGBA(r / 255.0, g / 255.0, b / 255.0, 1.0))
+        color_btn.connect("color-set", self.on_custom_accent_chosen)
+        color_btn.set_tooltip_text("Pick Any Custom Hex Color")
+        accent_box.pack_start(color_btn, False, False, 0)
+        vbox.pack_start(accent_box, False, False, 0)
+
+        # 2. Secondary Gradient Color
+        vbox.pack_start(self.make_section_title("2. Secondary Gradient Accent", "Blends with primary accent to create the 45° glowing window border."), False, False, 0)
+        sec_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        for hex_code, name in SWATCH_COLORS:
+            btn = Gtk.Button()
+            btn.set_tooltip_text(f"{name} ({hex_code})")
+            da = Gtk.DrawingArea()
+            da.set_size_request(32, 32)
+            da.connect("draw", self.draw_swatch_circle, hex_code)
+            btn.add(da)
+            btn.connect("clicked", self.set_secondary_color, hex_code)
+            sec_box.pack_start(btn, False, False, 0)
+
+        sec_color_btn = Gtk.ColorButton()
+        sr, sg, sb = hex_to_rgb(self.current_theme.get("secondary", "#89b4fa"))
+        sec_color_btn.set_rgba(Gdk.RGBA(sr / 255.0, sg / 255.0, sb / 255.0, 1.0))
+        sec_color_btn.connect("color-set", self.on_custom_secondary_chosen)
+        sec_box.pack_start(sec_color_btn, False, False, 0)
+        vbox.pack_start(sec_box, False, False, 0)
+
+        # 3. Base Background Dark Shade
+        vbox.pack_start(self.make_section_title("3. Background Atmosphere", "Dark base for Kitty terminal, Waybar, and system surfaces."), False, False, 0)
+        bg_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        for hex_code, name in BG_PRESETS:
+            btn = Gtk.Button(label=f" {name} ")
+            btn.connect("clicked", self.set_bg_color, hex_code)
+            bg_box.pack_start(btn, False, False, 0)
+        vbox.pack_start(bg_box, False, False, 0)
+
+        # 4. Generate matching wallpaper toggle
+        wall_switch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        wall_switch = Gtk.Switch()
+        wall_switch.set_active(self.current_theme.get("generate_wallpaper", False))
+        wall_switch.connect("notify::active", self.on_wall_switch_toggled)
+        wall_label = Gtk.Label(label="Auto-generate matching 4K gradient wallpaper on apply")
+        wall_switch_box.pack_start(wall_switch, False, False, 0)
+        wall_switch_box.pack_start(wall_label, False, False, 0)
+        vbox.pack_start(wall_switch_box, False, False, 0)
+
+        scroller.add(vbox)
+        return scroller
+
+    def build_layout_tab(self):
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        vbox.set_margin_left(30)
+        vbox.set_margin_right(30)
+        vbox.set_margin_top(15)
+        vbox.set_margin_bottom(25)
+
+        # Window Corner Rounding
+        vbox.pack_start(self.make_section_title("Window Corner Rounding", "Radius of window borders (0px for tiling purists, 10px-14px for modern aesthetic)."), False, False, 0)
+        rounding_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 24, 1)
+        rounding_scale.set_value(float(self.current_theme.get("rounding", 10)))
+        rounding_scale.set_digits(0)
+        rounding_scale.connect("value-changed", self.on_rounding_changed)
+        vbox.pack_start(rounding_scale, False, False, 0)
+
+        # Window Border Width
+        vbox.pack_start(self.make_section_title("Active Border Width", "Thickness of window borders in pixels."), False, False, 0)
+        border_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 1, 5, 1)
+        border_scale.set_value(float(self.current_theme.get("border_size", 2)))
+        border_scale.set_digits(0)
+        border_scale.connect("value-changed", self.on_border_changed)
+        vbox.pack_start(border_scale, False, False, 0)
+
+        # Inner Gaps
+        vbox.pack_start(self.make_section_title("Inner Tiling Gaps", "Gaps between tiled windows."), False, False, 0)
+        gaps_in_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 16, 1)
+        gaps_in_scale.set_value(float(self.current_theme.get("gaps_in", 6)))
+        gaps_in_scale.set_digits(0)
+        gaps_in_scale.connect("value-changed", self.on_gaps_in_changed)
+        vbox.pack_start(gaps_in_scale, False, False, 0)
+
+        # Outer Gaps
+        vbox.pack_start(self.make_section_title("Outer Screen Gaps", "Gaps between tiled windows and screen borders."), False, False, 0)
+        gaps_out_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0, 24, 1)
+        gaps_out_scale.set_value(float(self.current_theme.get("gaps_out", 12)))
+        gaps_out_scale.set_digits(0)
+        gaps_out_scale.connect("value-changed", self.on_gaps_out_changed)
+        vbox.pack_start(gaps_out_scale, False, False, 0)
+
+        # Window Opacity
+        vbox.pack_start(self.make_section_title("Window Opacity (Focus)", "Active window opacity (1.0 for solid, 0.95 for subtle coding transparency)."), False, False, 0)
+        opacity_scale = Gtk.Scale.new_with_range(Gtk.Orientation.HORIZONTAL, 0.70, 1.0, 0.05)
+        opacity_scale.set_value(float(self.current_theme.get("active_opacity", 1.0)))
+        opacity_scale.set_digits(2)
+        opacity_scale.connect("value-changed", self.on_opacity_changed)
+        vbox.pack_start(opacity_scale, False, False, 0)
+
+        scroller.add(vbox)
+        return scroller
+
+    def make_section_title(self, title, desc):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=3)
+        l1 = Gtk.Label()
+        l1.set_markup(f"<b>{title}</b>")
+        l1.set_halign(Gtk.Align.START)
+        l2 = Gtk.Label(label=desc)
+        l2.set_halign(Gtk.Align.START)
+        l2.get_style_context().add_class("dim-label")
+        box.pack_start(l1, False, False, 0)
+        box.pack_start(l2, False, False, 0)
+        return box
+
+    def set_accent_color(self, btn, hex_code):
+        self.current_theme["accent"] = hex_code
+        self.current_theme["id"] = "custom"
+        self.current_theme["name"] = f"Custom ({hex_code})"
+
+    def on_custom_accent_chosen(self, color_btn):
+        rgba = color_btn.get_rgba()
+        hex_code = f"#{int(rgba.red*255):02x}{int(rgba.green*255):02x}{int(rgba.blue*255):02x}"
+        self.current_theme["accent"] = hex_code
+        self.current_theme["id"] = "custom"
+        self.current_theme["name"] = f"Custom ({hex_code})"
+
+    def set_secondary_color(self, btn, hex_code):
+        self.current_theme["secondary"] = hex_code
+
+    def on_custom_secondary_chosen(self, color_btn):
+        rgba = color_btn.get_rgba()
+        hex_code = f"#{int(rgba.red*255):02x}{int(rgba.green*255):02x}{int(rgba.blue*255):02x}"
+        self.current_theme["secondary"] = hex_code
+
+    def set_bg_color(self, btn, hex_code):
+        self.current_theme["bg"] = hex_code
+
+    def on_wall_switch_toggled(self, switch, gparam):
+        self.current_theme["generate_wallpaper"] = switch.get_active()
+
+    def on_rounding_changed(self, scale):
+        self.current_theme["rounding"] = int(scale.get_value())
+
+    def on_border_changed(self, scale):
+        self.current_theme["border_size"] = int(scale.get_value())
+
+    def on_gaps_in_changed(self, scale):
+        self.current_theme["gaps_in"] = int(scale.get_value())
+
+    def on_gaps_out_changed(self, scale):
+        self.current_theme["gaps_out"] = int(scale.get_value())
+
+    def on_opacity_changed(self, scale):
+        self.current_theme["active_opacity"] = round(scale.get_value(), 2)
+
+    def on_apply_clicked(self, btn):
+        save_and_apply_theme(self.current_theme)
+
+    def apply_dark_css(self):
+        css = b"""
+        window {
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            font-family: "JetBrainsMono Nerd Font", sans-serif;
+        }
+        headerbar {
+            background-color: #181825;
+            border-bottom: 1px solid rgba(203, 166, 247, 0.2);
+            color: #cdd6f4;
+        }
+        .theme-card {
+            background-color: #181825;
+            border-radius: 12px;
+            padding: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 200ms ease;
+        }
+        .theme-card:hover {
+            border-color: rgba(203, 166, 247, 0.5);
+            background-color: #1f1f30;
+        }
+        .active-card {
+            border: 2px solid #cba6f7;
+            background-color: #1f1f35;
+        }
+        .dim-label {
+            color: #a6adc8;
+            font-size: 11px;
+        }
+        button {
+            border-radius: 8px;
+            font-weight: bold;
+            padding: 6px 12px;
+        }
+        button.suggested-action {
+            background: linear-gradient(45deg, #cba6f7, #89b4fa);
+            color: #11111b;
+            border: none;
+        }
+        button.suggested-action:hover {
+            background: linear-gradient(45deg, #d8b8ff, #9dc4ff);
+        }
+        scale trough {
+            background-color: #313244;
+            border-radius: 4px;
+            min-height: 8px;
+        }
+        scale highlight {
+            background: #cba6f7;
+            border-radius: 4px;
+        }
+        scale slider {
+            background: #cdd6f4;
+            border-radius: 50%;
+            min-width: 18px;
+            min-height: 18px;
+        }
+        """
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
+
+
+def main():
+    app = ThemeManagerWindow()
+    app.connect("destroy", Gtk.main_quit)
+    app.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

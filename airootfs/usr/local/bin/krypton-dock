@@ -50,6 +50,8 @@ APP_ICON_MAP = {
     "lazygit": ["git", "vcs-git", "git-gui", "utilities-terminal"],
     "settings": ["preferences-system", "org.gnome.Settings"],
     "krypton-settings": ["preferences-system", "org.gnome.Settings"],
+    "themes": ["preferences-desktop-theme", "preferences-system"],
+    "krypton-themes": ["preferences-desktop-theme", "preferences-system"],
     "calc": ["org.gnome.Calculator", "accessories-calculator"],
     "calculator": ["org.gnome.Calculator", "accessories-calculator"],
     "btop": ["utilities-system-monitor", "org.gnome.SystemMonitor", "system-monitor"],
@@ -70,6 +72,7 @@ CATALOG_APPS = [
     {"id": "btop", "name": "Task Manager", "icon_name": "utilities-system-monitor", "cmd": "kitty -e btop", "class_match": "btop"},
     {"id": "audio", "name": "Audio Mixer", "icon_name": "pavucontrol", "cmd": "pavucontrol", "class_match": "pavucontrol"},
     {"id": "disks", "name": "Disk Utility", "icon_name": "gnome-disks", "cmd": "gnome-disks", "class_match": "Disks"},
+    {"id": "themes", "name": "Theme Studio", "icon_name": "preferences-desktop-theme", "cmd": "/usr/local/bin/krypton-themes", "class_match": "krypton-themes"},
     {"id": "settings", "name": "Settings", "icon_name": "preferences-system", "cmd": "/usr/local/bin/krypton-settings", "class_match": "krypton-settings"},
 ]
 

@@ -1,10 +1,16 @@
-# KryptonOS .zshrc
+# KryptonOS .zshrc - Interactive Developer Shell
 
 # Developer Environment Variables
 export EDITOR="nvim"
 export VISUAL="code --no-sandbox"
 export PAGER="less"
 export LANG="en_US.UTF-8"
+
+# Language Ecosystems & Toolchain PATHs (Node, Rust, Go, Python, Lua)
+export PATH="$HOME/.cargo/bin:$HOME/go/bin:$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
+export GOPATH="$HOME/go"
+export CARGO_HOME="$HOME/.cargo"
+export RUSTUP_HOME="$HOME/.rustup"
 
 # History
 HISTFILE=~/.zsh_history
@@ -34,6 +40,12 @@ alias c='clear'
 alias y='yazi'
 alias lg='lazygit'
 
+# Quick Language Aliases
+alias py="python3"
+alias pip="pip3"
+alias d="docker"
+alias dco="docker-compose"
+
 # Git shortcuts
 alias g='git'
 alias gs='git status -sb'
@@ -50,29 +62,6 @@ alias gd='git diff'
 alias gds='git diff --staged'
 alias glg='git log --graph --oneline --decorate --all'
 
-# Developer helpers
-alias py='python3'
-alias pip='python3 -m pip'
-alias venv='python3 -m venv .venv && source .venv/bin/activate'
-alias activate='source .venv/bin/activate'
-alias dc='docker compose'
-alias dcu='docker compose up -d'
-alias dcd='docker compose down'
-alias dcl='docker compose logs -f'
-alias update='sudo pacman -Syu'
-alias cleanup='sudo pacman -Rns $(pacman -Qtdq)'
-alias krypton-install='sudo archinstall'
-
-# Yazi wrapper: changes directory when exiting yazi with q
-function yy() {
-	local tmp="$(mktemp -t "yazi-cwd.XXXXXX")"
-	yazi "$@" --cwd-file="$tmp"
-	if cwd="$(cat -- "$tmp")" && [ -n "$cwd" ] && [ "$cwd" != "$PWD" ]; then
-		builtin cd -- "$cwd"
-	fi
-	rm -f -- "$tmp"
-}
-
 # Keybindings
 bindkey -e
 
@@ -82,7 +71,9 @@ if [[ -o interactive ]]; then
 fi
 
 # Initialize Starship Prompt
-eval "$(starship init zsh)"
+if command -v starship &> /dev/null; then
+    eval "$(starship init zsh)"
+fi
 
 # Initialize Zoxide (Smart cd)
 if command -v zoxide &> /dev/null; then

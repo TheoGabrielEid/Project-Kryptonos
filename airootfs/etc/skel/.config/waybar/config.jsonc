@@ -2,108 +2,80 @@
     "layer": "top",
     "position": "top",
     "margin-top": 0,
-    "margin-left": 14,
-    "margin-right": 14,
+    "margin-left": 12,
+    "margin-right": 12,
     "height": 38,
-    "spacing": 8,
+    "spacing": 4,
     "modules-left": [
         "custom/launcher",
-        "custom/files",
-        "custom/browser",
-        "custom/terminal",
         "hyprland/workspaces",
-        "hyprland/window",
-        "custom/win-min",
-        "custom/win-max",
-        "custom/win-close"
+        "hyprland/window"
     ],
     "modules-center": [
         "clock"
     ],
     "modules-right": [
-        "pulseaudio",
-        "network",
         "cpu",
         "memory",
+        "pulseaudio",
+        "network",
         "battery",
         "tray",
+        "custom/themes",
         "custom/settings",
         "custom/power"
     ],
     "custom/launcher": {
-        "format": " ⬢  KRYPTON ",
+        "format": " 󰣇  KRYPTON ",
         "on-click": "rofi -show drun",
-        "tooltip-format": "KryptonOS App Launcher (Super+Space)"
-    },
-    "custom/files": {
-        "format": "   Files ",
-        "on-click": "thunar",
-        "on-click-right": "kitty -e yazi",
-        "tooltip-format": "File Explorer — Left click: Thunar GUI | Right click: Yazi Terminal File Manager (Super+E)"
-    },
-    "custom/browser": {
-        "format": " 󰈹  Helium ",
-        "on-click": "helium-browser",
-        "tooltip-format": "Helium Browser (Super+B)"
-    },
-    "custom/terminal": {
-        "format": "  ",
-        "on-click": "kitty",
-        "tooltip-format": "Kitty Terminal (Super+Return)"
-    },
-    "custom/win-min": {
-        "format": " 󰖰 ",
-        "on-click": "/usr/local/bin/krypton-win-ctl minimize",
-        "on-click-right": "/usr/local/bin/krypton-win-ctl restore",
-        "tooltip-format": "Minimize Active App (Left-click) | Restore Minimized App (Right-click or Super+M)"
-    },
-    "custom/win-max": {
-        "format": " 󰊓 ",
-        "on-click": "/usr/local/bin/krypton-win-ctl fullscreen",
-        "on-click-right": "/usr/local/bin/krypton-win-ctl maximize",
-        "tooltip-format": "Full Screen Active App (Left-click or Super+F) | Maximize Tiled (Right-click)"
-    },
-    "custom/win-close": {
-        "format": " 󰅖 ",
-        "on-click": "/usr/local/bin/krypton-win-ctl close",
-        "tooltip-format": "Exit / Close Active App (Super+Q)"
+        "tooltip-format": "KryptonOS Application Launcher (Super+Space)"
     },
     "hyprland/workspaces": {
-        "format": "{icon}",
+        "format": "{name}",
         "on-click": "activate",
+        "all-outputs": true,
         "format-icons": {
-            "1": "一",
-            "2": "二",
-            "3": "三",
-            "4": "四",
-            "5": "五",
-            "6": "六",
+            "1": " 1",
+            "2": "󰨞 2",
+            "3": "󰈹 3",
+            "4": "󰊢 4",
+            "5": "󱁤 5",
+            "6": " 6",
             "urgent": "",
             "active": "",
             "default": ""
         }
     },
+    "hyprland/window": {
+        "format": "{title}",
+        "max-length": 45,
+        "separate-outputs": true
+    },
     "clock": {
-        "format": "  {:%H:%M  󰃭 %a %d %b}",
+        "format": "󰥔  {:%H:%M  󰃭 %a %d %b}",
         "tooltip-format": "<big>{:%Y %B}</big>\n<tt><small>{calendar}</small></tt>"
     },
     "cpu": {
         "format": " {usage}%",
-        "tooltip": false
+        "tooltip": true,
+        "interval": 2
     },
     "memory": {
-        "format": " {}%"
+        "format": " {}%",
+        "tooltip": true,
+        "interval": 2
     },
     "network": {
-        "format-wifi": "  {essid}",
+        "format-wifi": "󰤨  {essid}",
         "format-ethernet": "󰈀 Wired",
-        "format-disconnected": "󰖪 Offline"
+        "format-disconnected": "󰤭 Offline",
+        "tooltip-format": "{ifname}: {ipaddr}/{cidr}"
     },
     "pulseaudio": {
         "format": "{icon} {volume}%",
         "format-muted": "󰝟 Muted",
         "format-icons": {
-            "default": ["", "", ""]
+            "default": ["󰕿", "󰖀", "󰕾"]
         },
         "on-click": "pavucontrol"
     },
@@ -114,17 +86,22 @@
         },
         "format": "{icon} {capacity}%",
         "format-charging": "󰂄 {capacity}%",
-        "format-plugged": " {capacity}%",
+        "format-plugged": "󰚥 {capacity}%",
         "format-icons": ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
     },
+    "custom/themes": {
+        "format": "󰔎 Themes",
+        "on-click": "/usr/local/bin/krypton-themes",
+        "tooltip-format": "Krypton Theme Studio (Super+Shift+T)"
+    },
     "custom/settings": {
-        "format": " ",
+        "format": "",
         "on-click": "/usr/local/bin/krypton-settings",
-        "tooltip-format": "KryptonOS System Settings (Display, FPS, Audio)"
+        "tooltip-format": "KryptonOS Settings (Super+S)"
     },
     "custom/power": {
-        "format": " ",
+        "format": "⏻",
         "on-click": "/usr/local/bin/krypton-powermenu",
-        "tooltip": false
+        "tooltip-format": "Power Menu"
     }
 }

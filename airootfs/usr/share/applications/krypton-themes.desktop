@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=Theme Studio
+GenericName=Desktop Themes & Appearance
+Comment=Personalize desktop themes, colors, borders, and tiling aesthetics
+Exec=/usr/local/bin/krypton-themes
+Icon=preferences-desktop-theme
+Terminal=false
+Type=Application
+Categories=Settings;DesktopSettings;GTK;Appearance;
+Keywords=theme;colors;appearance;customization;mocha;nord;dracula;
+StartupNotify=true

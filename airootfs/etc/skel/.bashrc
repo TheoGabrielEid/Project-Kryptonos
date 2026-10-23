@@ -3,7 +3,7 @@
 
 # Developer Environment Variables
 export EDITOR="nvim"
-export VISUAL="code"
+export VISUAL="code --no-sandbox"
 export PAGER="less"
 export MANPAGER="sh -c 'col -bx | bat -l man -p'"
 export LANG="en_US.UTF-8"
@@ -11,6 +11,12 @@ export HISTSIZE=50000
 export HISTFILESIZE=50000
 export HISTCONTROL=ignoreboth:erasedups
 shopt -s histappend
+
+# Language Ecosystems & Toolchain PATHs (Node, Rust, Go, Python, Lua)
+export PATH="$HOME/.cargo/bin:$HOME/go/bin:$HOME/.local/bin:$HOME/.npm-global/bin:$PATH"
+export GOPATH="$HOME/go"
+export CARGO_HOME="$HOME/.cargo"
+export RUSTUP_HOME="$HOME/.rustup"
 
 # Modern CLI Tool Replacements
 alias ls='eza --icons --group-directories-first'
@@ -22,6 +28,12 @@ alias y='yazi'
 alias v='nvim'
 alias vim='nvim'
 alias c='clear'
+
+# Quick Language Aliases
+alias py="python3"
+alias pip="pip3"
+alias d="docker"
+alias dco="docker-compose"
 
 # Git Productivity Shortcuts
 alias g='git'
@@ -41,33 +53,23 @@ alias gds='git diff --staged'
 alias glg='git log --graph --oneline --decorate --all'
 alias lg='lazygit'
 
-# Developer Helpers
-alias code='code --no-sandbox'
-alias py='python3'
-alias pip='python3 -m pip'
-alias venv='python3 -m venv .venv && source .venv/bin/activate'
-alias activate='source .venv/bin/activate'
-alias dc='docker compose'
-alias dcu='docker compose up -d'
-alias dcd='docker compose down'
-alias dcl='docker compose logs -f'
-
-# Fast directory jumping with zoxide (if installed)
-if command -v zoxide &>/dev/null; then
-    eval "$(zoxide init bash)"
-fi
-
-# Fuzzy Finder (fzf) integration
-if command -v fzf &>/dev/null; then
-    eval "$(fzf --bash 2>/dev/null)" || true
-fi
-
-# Fastfetch welcome banner (displays Arch Linux logo with system info)
-if command -v fastfetch &>/dev/null; then
+# Fastfetch Banner on Interactive Terminal Launch
+if [ -n "$PS1" ] && [ -z "$VIRTUAL_ENV" ] && [ "$TERM" != "dumb" ]; then
     fastfetch
 fi
 
 # Starship Prompt
-if command -v starship &>/dev/null; then
+if command -v starship >/dev/null 2>&1; then
     eval "$(starship init bash)"
+fi
+
+# Zoxide (Smart cd)
+if command -v zoxide >/dev/null 2>&1; then
+    eval "$(zoxide init bash)"
+    alias cd="z"
+fi
+
+# FZF Shell Integration
+if command -v fzf >/dev/null 2>&1; then
+    eval "$(fzf --bash 2>/dev/null || true)"
 fi

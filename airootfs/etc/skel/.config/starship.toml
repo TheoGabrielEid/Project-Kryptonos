@@ -13,6 +13,11 @@ $nodejs\
 $rust\
 $golang\
 $python\
+$java\
+$php\
+$ruby\
+$lua\
+$docker_context\
 [](fg:#585b70)\
 $character"""
 
@@ -50,6 +55,31 @@ symbol = "󰟓"
 style = "fg:#f9e2af bg:#585b70"
 format = "[[ $symbol ($version) ]($style)]()"
 symbol = "󰌠"
+
+[java]
+style = "fg:#f38ba8 bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = ""
+
+[php]
+style = "fg:#89b4fa bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = ""
+
+[ruby]
+style = "fg:#f38ba8 bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = ""
+
+[lua]
+style = "fg:#89dceb bg:#585b70"
+format = "[[ $symbol ($version) ]($style)]()"
+symbol = ""
+
+[docker_context]
+style = "fg:#89b4fa bg:#585b70"
+format = "[[ $symbol $context ]($style)]()"
+symbol = "󰡨"
 
 [character]
 success_symbol = "[ ❯](bold #a6e3a1)"
