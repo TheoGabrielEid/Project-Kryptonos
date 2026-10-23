@@ -18,6 +18,7 @@ gi.require_version("Gdk", "3.0")
 from gi.repository import Gtk, Gdk, Gio, GLib
 
 RESOLUTIONS = [
+    ("Auto / Fit to Window (Recommended)", "preferred"),
     ("2560x1600 (16:10 WQXGA - Native Fullscreen)", "2560x1600"),
     ("2560x1440 (16:9 QHD)", "2560x1440"),
     ("1920x1200 (16:10 WUXGA - Default Fullscreen)", "1920x1200"),
@@ -29,7 +30,6 @@ RESOLUTIONS = [
     ("1366x768 (16:9 WXGA)", "1366x768"),
     ("1280x800 (16:10 WXGA)", "1280x800"),
     ("3840x2160 (16:9 4K UHD)", "3840x2160"),
-    ("Auto / Preferred", "preferred"),
 ]
 
 REFRESH_RATES = [
@@ -325,31 +325,66 @@ class KryptonSettingsWindow(Gtk.Window):
         self.res_combo = Gtk.ComboBoxText()
         for label, _ in RESOLUTIONS:
             self.res_combo.append_text(label)
-        self.res_combo.set_active(2)
 
         self.fps_combo = Gtk.ComboBoxText()
         for label, _ in REFRESH_RATES:
             self.fps_combo.append_text(label)
-        self.fps_combo.set_active(5)
 
         self.scale_combo = Gtk.ComboBoxText()
         for label, _ in SCALES:
             self.scale_combo.append_text(label)
-        self.scale_combo.set_active(0)
 
-        cur_w = self.monitors[0].get("width", 1920)
-        cur_h = self.monitors[0].get("height", 1200)
-        cur_res = f"{cur_w}x{cur_h}"
+        # Detect active configuration from ~/.config/hypr/monitors.conf
+        conf_res = "preferred"
+        conf_fps = "60"
+        conf_scale = "1"
+        mon_conf_path = os.path.expanduser("~/.config/hypr/monitors.conf")
+        if os.path.exists(mon_conf_path):
+            try:
+                with open(mon_conf_path, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if line.startswith("monitor") and "=" in line:
+                            parts = [p.strip() for p in line.split("=", 1)[1].split(",")]
+                            if len(parts) >= 2:
+                                mode_part = parts[1]
+                                if mode_part == "preferred":
+                                    conf_res = "preferred"
+                                else:
+                                    if "@" in mode_part:
+                                        r, f_val = mode_part.split("@", 1)
+                                        conf_res = r
+                                        conf_fps = f_val
+                                    else:
+                                        conf_res = mode_part
+                            if len(parts) >= 4:
+                                conf_scale = parts[3]
+            except Exception:
+                pass
+
+        # Select corresponding index in res_combo
+        res_idx = 0
         for idx, (_, val) in enumerate(RESOLUTIONS):
-            if val == cur_res:
-                self.res_combo.set_active(idx)
+            if val == conf_res:
+                res_idx = idx
                 break
+        self.res_combo.set_active(res_idx)
 
-        cur_fps = str(int(round(self.monitors[0].get("refreshRate", 60))))
+        # Select corresponding index in fps_combo
+        fps_idx = 5
         for idx, (_, val) in enumerate(REFRESH_RATES):
-            if val == cur_fps:
-                self.fps_combo.set_active(idx)
+            if val == conf_fps:
+                fps_idx = idx
                 break
+        self.fps_combo.set_active(fps_idx)
+
+        # Select corresponding index in scale_combo
+        scale_idx = 0
+        for idx, (_, val) in enumerate(SCALES):
+            if val == conf_scale:
+                scale_idx = idx
+                break
+        self.scale_combo.set_active(scale_idx)
 
         sec1.pack_start(make_row("Screen Resolution", "Choose resolution or fit to entire screen", self.res_combo), False, False, 0)
         sec1.pack_start(make_row("Refresh Rate / Target FPS", "Set display refresh rate (Hz / FPS)", self.fps_combo), False, False, 0)
@@ -358,11 +393,12 @@ class KryptonSettingsWindow(Gtk.Window):
         apply_btn = Gtk.Button(label="Apply & Save Permanently")
         apply_btn.get_style_context().add_class("primary-btn")
         apply_btn.connect("clicked", self.on_apply_display)
-        sec1.pack_start(make_row("Apply Display Configuration", "Updates live session & saves to hyprland.lua", apply_btn), False, False, 0)
+        sec1.pack_start(make_row("Apply Display Configuration", "Updates live session & saves permanently", apply_btn), False, False, 0)
         page.pack_start(sec1, False, False, 0)
 
-        sec2 = make_section("One-Click Fullscreen Presets", "Instant presets for your display")
+        sec2 = make_section("One-Click Display Presets", "Instant presets for your display")
         presets = [
+            ("Auto / Fit to Window (Recommended)", "preferred", "60", "1"),
             ("Fit Native Fullscreen (2560x1600 @ 240Hz)", "2560x1600", "240", "1"),
             ("Fit Native Fullscreen HiDPI (2560x1600 @ 240Hz, 1.25x Scale)", "2560x1600", "240", "1.25"),
             ("Fit 16:10 Fullscreen (1920x1200 @ 120Hz)", "1920x1200", "120", "1"),
@@ -937,10 +973,6 @@ class KryptonSettingsWindow(Gtk.Window):
         try:
             with open(mon_conf_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            # Update state file for daemon
-            state_file = os.path.expanduser("~/.config/hypr/.last_resolution")
-            with open(state_file, "w", encoding="utf-8") as f:
-                f.write(f"{res}@{fps}@{scale}")
             subprocess.run(["sync"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:
             sys.stderr.write(f"Failed to save monitors.conf: {e}\n")

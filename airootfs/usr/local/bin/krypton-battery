@@ -1,121 +1,178 @@
 #!/usr/bin/env python3
 """
-KryptonOS Intelligent Battery & Power Monitor for Waybar
-Detects hardware ACPI battery, VMware host battery passthrough, upower, or AC mains.
-Guarantees the battery indicator is always visible and functional on the top menu bar.
+KryptonOS Accurate Battery & Power Monitor for Waybar
+Queries Linux ACPI power_supply subsystem, acpi CLI, UPower, and VMware ACPI battery reporting.
+Provides real-time, accurate battery percentage and charging state.
 """
 import glob
 import json
 import os
+import re
 import subprocess
 import sys
 
 
-def get_power_info():
-    # 1. Check ACPI Power Supply directory (/sys/class/power_supply/BAT*)
-    bat_paths = glob.glob("/sys/class/power_supply/BAT*") + \
-                glob.glob("/sys/class/power_supply/battery*") + \
-                glob.glob("/sys/class/power_supply/CMB*")
+def parse_sysfs():
+    """Inspect all power_supply devices in sysfs for authentic battery telemetry."""
+    # Check all power supply devices
+    candidates = glob.glob("/sys/class/power_supply/*")
+    
+    # Priority: items with 'bat' or 'battery' in name, or type == Battery
+    bat_dirs = []
+    ac_dirs = []
+    
+    for d in candidates:
+        name = os.path.basename(d).lower()
+        type_file = os.path.join(d, "type")
+        dev_type = ""
+        if os.path.exists(type_file):
+            try:
+                with open(type_file, "r") as f:
+                    dev_type = f.read().strip().lower()
+            except Exception:
+                pass
+        
+        if "bat" in name or dev_type == "battery":
+            bat_dirs.append(d)
+        elif "ac" in name or "adp" in name or "line" in name or dev_type == "mains":
+            ac_dirs.append(d)
 
-    for b in bat_paths:
+    # Search battery directories first
+    for b in bat_dirs:
+        capacity = None
+        status = "Unknown"
+        
+        # 1. Direct capacity file
         cap_file = os.path.join(b, "capacity")
-        stat_file = os.path.join(b, "status")
         if os.path.exists(cap_file):
             try:
                 with open(cap_file, "r") as f:
-                    capacity = max(0, min(100, int(f.read().strip())))
-                status = "Discharging"
-                if os.path.exists(stat_file):
-                    with open(stat_file, "r") as f:
-                        status = f.read().strip()
-
-                is_charging = status.lower() in ("charging", "full")
-                
-                icons = ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
-                icon_idx = min(10, max(0, capacity // 10))
-                icon = "󰂄" if is_charging else icons[icon_idx]
-                
-                if is_charging:
-                    cls = "charging"
-                elif capacity <= 15:
-                    cls = "critical"
-                elif capacity <= 30:
-                    cls = "warning"
-                else:
-                    cls = "normal"
-
-                return {
-                    "text": f"{icon} {capacity}%",
-                    "tooltip": f"Battery: {capacity}% ({status})\nPower Source: Battery ({os.path.basename(b)})",
-                    "class": cls,
-                    "percentage": capacity,
-                    "raw_status": f"Battery {capacity}% ({status})"
-                }
+                    capacity = int(f.read().strip())
             except Exception:
                 pass
 
-    # 2. Check upower command
+        # 2. Compute from charge_now / charge_full
+        if capacity is None:
+            c_now = os.path.join(b, "charge_now")
+            c_full = os.path.join(b, "charge_full")
+            if os.path.exists(c_now) and os.path.exists(c_full):
+                try:
+                    with open(c_now, "r") as f1, open(c_full, "r") as f2:
+                        now_val = float(f1.read().strip())
+                        full_val = float(f2.read().strip())
+                        if full_val > 0:
+                            capacity = int(round((now_val / full_val) * 100))
+                except Exception:
+                    pass
+
+        # 3. Compute from energy_now / energy_full
+        if capacity is None:
+            e_now = os.path.join(b, "energy_now")
+            e_full = os.path.join(b, "energy_full")
+            if os.path.exists(e_now) and os.path.exists(e_full):
+                try:
+                    with open(e_now, "r") as f1, open(e_full, "r") as f2:
+                        now_val = float(f1.read().strip())
+                        full_val = float(f2.read().strip())
+                        if full_val > 0:
+                            capacity = int(round((now_val / full_val) * 100))
+                except Exception:
+                    pass
+
+        stat_file = os.path.join(b, "status")
+        if os.path.exists(stat_file):
+            try:
+                with open(stat_file, "r") as f:
+                    status = f.read().strip()
+            except Exception:
+                pass
+
+        if capacity is not None:
+            return capacity, status, os.path.basename(b)
+
+    return None, None, None
+
+
+def parse_acpi_cli():
+    """Fallback: query acpi -b CLI tool."""
     try:
-        devices = subprocess.check_output(
-            ["upower", "-e"], stderr=subprocess.DEVNULL, timeout=1.5, text=True
-        ).splitlines()
-        
+        out = subprocess.check_output(["acpi", "-b"], stderr=subprocess.DEVNULL, timeout=1.0, text=True)
+        # Example: Battery 0: Discharging, 80%, 02:40:00 remaining
+        m_pct = re.search(r"(\d+)%", out)
+        m_stat = re.search(r":\s*([A-Za-z]+),", out)
+        if m_pct:
+            pct = int(m_pct.group(1))
+            stat = m_stat.group(1) if m_stat else "Unknown"
+            return pct, stat, "acpi-tool"
+    except Exception:
+        pass
+    return None, None, None
+
+
+def parse_upower():
+    """Fallback: query UPower service."""
+    try:
+        devices = subprocess.check_output(["upower", "-e"], stderr=subprocess.DEVNULL, timeout=1.0, text=True).splitlines()
         for dev in devices:
-            if "battery" in dev.lower() or "display_device" in dev.lower():
-                dev_info = subprocess.check_output(
-                    ["upower", "-i", dev], stderr=subprocess.DEVNULL, timeout=1.5, text=True
-                )
+            if "battery" in dev.lower():
+                info = subprocess.check_output(["upower", "-i", dev], stderr=subprocess.DEVNULL, timeout=1.0, text=True)
                 cap = None
                 state = "Discharging"
-                for line in dev_info.splitlines():
+                for line in info.splitlines():
                     line = line.strip()
                     if line.startswith("percentage:"):
                         cap = int(float(line.split(":")[1].replace("%", "").strip()))
                     elif line.startswith("state:"):
                         state = line.split(":")[1].strip()
-
                 if cap is not None:
-                    is_charging = "charg" in state.lower() or "full" in state.lower()
-                    icons = ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
-                    icon_idx = min(10, max(0, cap // 10))
-                    icon = "󰂄" if is_charging else icons[icon_idx]
-                    cls = "charging" if is_charging else ("critical" if cap <= 15 else ("warning" if cap <= 30 else "normal"))
-
-                    return {
-                        "text": f"{icon} {cap}%",
-                        "tooltip": f"Battery: {cap}% ({state})\nDetected via UPower",
-                        "class": cls,
-                        "percentage": cap,
-                        "raw_status": f"Battery {cap}% ({state})"
-                    }
+                    return cap, state, "upower"
     except Exception:
         pass
+    return None, None, None
 
-    # 3. Check AC adapter status (/sys/class/power_supply/AC* /ADP* /line*)
-    ac_paths = glob.glob("/sys/class/power_supply/AC*") + \
-               glob.glob("/sys/class/power_supply/ADP*") + \
-               glob.glob("/sys/class/power_supply/*online*")
-    for a in ac_paths:
-        online_file = os.path.join(a, "online")
-        if os.path.exists(online_file):
-            try:
-                with open(online_file, "r") as f:
-                    online = f.read().strip()
-                if online == "1":
-                    return {
-                        "text": "󰚥 100%",
-                        "tooltip": "Power Supply: Connected to AC / Host Power (100%)\nStatus: Optimal Power Delivery",
-                        "class": "plugged",
-                        "percentage": 100,
-                        "raw_status": "AC Power: Connected (100%)"
-                    }
-            except Exception:
-                pass
 
-    # 4. Universal Solid Fallback for VM / Desktop
+def get_power_data():
+    # 1. Sysfs
+    cap, status, src = parse_sysfs()
+    
+    # 2. ACPI tool
+    if cap is None:
+        cap, status, src = parse_acpi_cli()
+
+    # 3. UPower
+    if cap is None:
+        cap, status, src = parse_upower()
+
+    # If authentic battery found:
+    if cap is not None:
+        cap = max(0, min(100, cap))
+        is_charging = any(w in status.lower() for w in ["charg", "plug", "full"])
+        
+        icons = ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+        icon_idx = min(10, max(0, cap // 10))
+        icon = "󰂄" if (is_charging and cap < 100) else icons[icon_idx]
+
+        if is_charging:
+            cls = "charging"
+        elif cap <= 15:
+            cls = "critical"
+        elif cap <= 30:
+            cls = "warning"
+        else:
+            cls = "normal"
+
+        return {
+            "text": f"{icon} {cap}%",
+            "tooltip": f"Battery: {cap}% ({status})\nSource: {src}",
+            "class": cls,
+            "percentage": cap,
+            "raw_status": f"Battery {cap}% ({status})"
+        }
+
+    # 4. AC Power Fallback (True AC without battery - do NOT show fake 100%)
     return {
-        "text": "󰚥 100%",
-        "tooltip": "Power Supply: Connected to AC / Host Power (100%)\nStatus: Continuous Power Supply",
+        "text": "󰚥 AC",
+        "tooltip": "Power Supply: Connected to AC Mains / Host Supply\nNo internal battery hardware detected.",
         "class": "plugged",
         "percentage": 100,
         "raw_status": "Connected to AC Power"
@@ -123,11 +180,11 @@ def get_power_info():
 
 
 def main():
-    info = get_power_info()
+    data = get_power_data()
     if len(sys.argv) > 1 and sys.argv[1] == "--info":
-        print(info.get("tooltip", info.get("raw_status", "Power OK")))
+        print(data.get("tooltip", data.get("raw_status", "Power OK")))
     else:
-        print(json.dumps(info))
+        print(json.dumps(data))
 
 
 if __name__ == "__main__":
