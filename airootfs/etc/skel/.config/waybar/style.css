@@ -28,6 +28,7 @@ window#waybar {
 #cpu,
 #memory,
 #battery,
+#custom-battery,
 #tray,
 #custom-settings,
 #custom-power {
@@ -119,12 +120,29 @@ window#waybar {
     margin-left: 4px;
 }
 
-#battery {
+#battery,
+#custom-battery {
     color: #f9e2af;
     margin-left: 4px;
 }
 
-#battery.critical {
+#battery.charging,
+#custom-battery.charging {
+    color: #a6e3a1;
+}
+
+#battery.plugged,
+#custom-battery.plugged {
+    color: #89b4fa;
+}
+
+#battery.warning,
+#custom-battery.warning {
+    color: #fab387;
+}
+
+#battery.critical,
+#custom-battery.critical {
     color: #f38ba8;
     animation: blink 0.8s linear infinite alternate;
 }

@@ -908,44 +908,44 @@ class KryptonSettingsWindow(Gtk.Window):
 
     def apply_display_values(self, res, fps, scale):
         self.monitors = get_monitors()
-        mon_name = self.monitors[0].get("name", "Virtual-1")
+        mon_name = self.monitors[0].get("name", "Virtual-1") if self.monitors else "Virtual-1"
 
         if res == "preferred":
             mode_str = "preferred"
+            hypr_rule = f"monitor = ,preferred,auto,{scale}"
             wlr_cmd = f"wlr-randr --output {mon_name} --preferred --scale {scale}"
         else:
             mode_str = f"{res}@{fps}"
-            wlr_cmd = f"wlr-randr --output {mon_name} --custom-mode {res}@{fps}Hz --scale {scale}"
+            hypr_rule = f"monitor = ,{mode_str},auto,{scale}"
+            wlr_cmd = f"wlr-randr --output {mon_name} --mode {res}@{fps}Hz --scale {scale}"
 
+        # 1. Apply live in Hyprland
+        run_cmd(f'hyprctl keyword monitor ",{mode_str},auto,{scale}"')
+        run_cmd(f'hyprctl keyword monitor "{mon_name},{mode_str},auto,{scale}"')
         run_cmd(wlr_cmd)
-        run_cmd(f'hyprctl eval \'hl.monitor({{ output = "", mode = "{mode_str}", position = "auto", scale = "{scale}" }})\'')
 
-        lua_path = os.path.expanduser("~/.config/hypr/hyprland.lua")
-        if os.path.exists(lua_path):
-            try:
-                with open(lua_path, "r", encoding="utf-8") as f:
-                    content = f.read()
-                new_block = (
-                    f'hl.monitor({{\n'
-                    f'    output   = "",\n'
-                    f'    mode     = "{mode_str}",\n'
-                    f'    position = "auto",\n'
-                    f'    scale    = "{scale}",\n'
-                    f'}})'
-                )
-                content = re.sub(
-                    r'hl\.monitor\(\{[^}]+\}\)',
-                    new_block,
-                    content,
-                    count=1,
-                )
-                with open(lua_path, "w", encoding="utf-8") as f:
-                    f.write(content)
-                subprocess.run("sync", shell=True)
-            except Exception:
-                pass
+        # 2. Persist permanently to ~/.config/hypr/monitors.conf
+        mon_conf_path = os.path.expanduser("~/.config/hypr/monitors.conf")
+        os.makedirs(os.path.dirname(mon_conf_path), exist_ok=True)
+        content = (
+            "# ==============================================================================\n"
+            "# KryptonOS Persistent Display & Resolution Configuration\n"
+            "# Automatically saved by Krypton Display Settings\n"
+            "# ==============================================================================\n"
+            f"{hypr_rule}\n"
+        )
+        try:
+            with open(mon_conf_path, "w", encoding="utf-8") as f:
+                f.write(content)
+            # Update state file for daemon
+            state_file = os.path.expanduser("~/.config/hypr/.last_resolution")
+            with open(state_file, "w", encoding="utf-8") as f:
+                f.write(f"{res}@{fps}@{scale}")
+            subprocess.run(["sync"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception as e:
+            sys.stderr.write(f"Failed to save monitors.conf: {e}\n")
 
-        self.notify(f"Saved {mode_str} (Scale {scale}x) permanently!")
+        self.notify(f"Applied and saved {mode_str} (Scale {scale}x) permanently!")
 
 
 def main():

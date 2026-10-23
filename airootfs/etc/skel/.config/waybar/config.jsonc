@@ -19,7 +19,7 @@
         "memory",
         "pulseaudio",
         "network",
-        "battery",
+        "custom/battery",
         "tray",
         "custom/themes",
         "custom/settings",
@@ -79,15 +79,14 @@
         },
         "on-click": "pavucontrol"
     },
-    "battery": {
-        "states": {
-            "warning": 30,
-            "critical": 15
-        },
-        "format": "{icon} {capacity}%",
-        "format-charging": "󰂄 {capacity}%",
-        "format-plugged": "󰚥 {capacity}%",
-        "format-icons": ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    "custom/battery": {
+        "exec": "python3 /usr/local/bin/krypton-battery",
+        "return-type": "json",
+        "interval": 5,
+        "format": "{}",
+        "tooltip": true,
+        "on-click": "/usr/local/bin/krypton-settings",
+        "on-click-right": "notify-send 'Battery & Power Status' \"$(python3 /usr/local/bin/krypton-battery --info)\""
     },
     "custom/themes": {
         "format": "󰔎 Themes",
