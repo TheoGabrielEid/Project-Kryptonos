@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
 """
-KryptonOS Theme Studio & Customizer (GTK 3.0)
-Allows choosing preset developer themes or crafting custom desktop themes.
+KryptonOS Theme Studio & Wallpaper Hub (GTK 3.0)
+Allows choosing preset developer themes, switching categorized wallpapers
+(Landscape, Anime & Characters, Movie & Cinema, Minimal), and crafting custom desktop themes.
 Live updates Hyprland, Waybar, Kitty Terminal, Dock, and Wallpapers.
 """
+import glob
 import json
 import os
+import random
 import subprocess
 import sys
 
 import gi
 gi.require_version("Gtk", "3.0")
 gi.require_version("Gdk", "3.0")
-from gi.repository import Gtk, Gdk, GLib
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, Gdk, GLib, GdkPixbuf
+
+WALLPAPERS_DIR = "/usr/share/backgrounds/krypton"
+WALLPAPERS_CATALOG = os.path.join(WALLPAPERS_DIR, "wallpapers.json")
 
 THEMES = {
     "catppuccin": {
@@ -24,6 +31,9 @@ THEMES = {
         "card": "#181825",
         "text": "#cdd6f4",
         "inactive_border": "#313244",
+        "wallpaper": "/usr/share/backgrounds/krypton/anime/lofi-study.png",
+        "wallpaper_name": "Lofi Night Study",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/lofi-study.png",
         "terminal": {
             "foreground": "#cdd6f4",
             "background": "#1e1e2e",
@@ -43,6 +53,9 @@ THEMES = {
         "card": "#16161e",
         "text": "#c0caf5",
         "inactive_border": "#292e42",
+        "wallpaper": "/usr/share/backgrounds/krypton/anime/cyber-samurai.png",
+        "wallpaper_name": "Neo-Tokyo Cyber Samurai",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/cyber-samurai.png",
         "terminal": {
             "foreground": "#c0caf5",
             "background": "#1a1b26",
@@ -62,6 +75,9 @@ THEMES = {
         "card": "#242933",
         "text": "#eceff4",
         "inactive_border": "#434c5e",
+        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.png",
+        "wallpaper_name": "Arctic Aurora Borealis",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora.png",
         "terminal": {
             "foreground": "#eceff4",
             "background": "#2e3440",
@@ -81,6 +97,9 @@ THEMES = {
         "card": "#1e1f29",
         "text": "#f8f8f2",
         "inactive_border": "#44475a",
+        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/interstellar-astronaut.png",
+        "wallpaper_name": "Interstellar Cosmic Explorer",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/interstellar-astronaut.png",
         "terminal": {
             "foreground": "#f8f8f2",
             "background": "#282a36",
@@ -100,6 +119,9 @@ THEMES = {
         "card": "#050608",
         "text": "#e0f8ff",
         "inactive_border": "#21283b",
+        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/cyberpunk-noir.png",
+        "wallpaper_name": "Blade Runner Neo-Noir",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/cyberpunk-noir.png",
         "terminal": {
             "foreground": "#e0f8ff",
             "background": "#0c0e14",
@@ -119,6 +141,9 @@ THEMES = {
         "card": "#1d2021",
         "text": "#ebdbb2",
         "inactive_border": "#3c3836",
+        "wallpaper": "/usr/share/backgrounds/krypton/landscapes/desert-dunes.png",
+        "wallpaper_name": "Golden Desert Horizon",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/desert-dunes.png",
         "terminal": {
             "foreground": "#ebdbb2",
             "background": "#282828",
@@ -138,6 +163,9 @@ THEMES = {
         "card": "#030604",
         "text": "#d4ffe6",
         "inactive_border": "#132b1e",
+        "wallpaper": "/usr/share/backgrounds/krypton/cinematic/emerald-matrix.png",
+        "wallpaper_name": "Matrix Cyberspace",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/emerald-matrix.png",
         "terminal": {
             "foreground": "#d4ffe6",
             "background": "#080d0a",
@@ -157,6 +185,9 @@ THEMES = {
         "card": "#1f1d2e",
         "text": "#e0def4",
         "inactive_border": "#26233a",
+        "wallpaper": "/usr/share/backgrounds/krypton/anime/sakura-fuji.png",
+        "wallpaper_name": "Sakura Mount Fuji",
+        "wallpaper_thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-fuji.png",
         "terminal": {
             "foreground": "#e0def4",
             "background": "#191724",
@@ -208,6 +239,112 @@ def hex_clean(hex_str):
     return hex_str.lstrip("#")
 
 
+def load_wallpapers_catalog():
+    if os.path.exists(WALLPAPERS_CATALOG):
+        try:
+            with open(WALLPAPERS_CATALOG, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    # Fallback default items
+    return [
+        {
+            "id": "lofi-study",
+            "name": "Lofi Night Study",
+            "category": "anime",
+            "category_label": "Anime Aesthetic",
+            "file": "/usr/share/backgrounds/krypton/anime/lofi-study.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/lofi-study.png",
+            "desc": "Warm anime study desk with steaming tea, code, and rain outside."
+        },
+        {
+            "id": "cyber-samurai",
+            "name": "Neo-Tokyo Cyber Samurai",
+            "category": "anime",
+            "category_label": "Anime & Characters",
+            "file": "/usr/share/backgrounds/krypton/anime/cyber-samurai.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/cyber-samurai.png",
+            "desc": "Futuristic ronin warrior looking over neon-lit skyscraper holograms."
+        },
+        {
+            "id": "sakura-fuji",
+            "name": "Sakura Mount Fuji",
+            "category": "anime",
+            "category_label": "Anime Aesthetic",
+            "file": "/usr/share/backgrounds/krypton/anime/sakura-fuji.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-fuji.png",
+            "desc": "Delicate cherry blossoms and glowing lanterns at twilight."
+        },
+        {
+            "id": "nordic-aurora",
+            "name": "Arctic Aurora Borealis",
+            "category": "landscape",
+            "category_label": "Landscape",
+            "file": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora.png",
+            "desc": "Emerald mountain lake reflecting vibrant northern lights."
+        },
+        {
+            "id": "desert-dunes",
+            "name": "Golden Desert Horizon",
+            "category": "landscape",
+            "category_label": "Landscape",
+            "file": "/usr/share/backgrounds/krypton/landscapes/desert-dunes.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/desert-dunes.png",
+            "desc": "Serene rolling dunes with warm violet and amber sunset."
+        },
+        {
+            "id": "interstellar-astronaut",
+            "name": "Interstellar Cosmic Explorer",
+            "category": "cinematic",
+            "category_label": "Movie & Characters",
+            "file": "/usr/share/backgrounds/krypton/cinematic/interstellar-astronaut.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/interstellar-astronaut.png",
+            "desc": "Sci-fi explorer standing before an immense cosmic nebula."
+        },
+        {
+            "id": "cyberpunk-noir",
+            "name": "Blade Runner Neo-Noir",
+            "category": "cinematic",
+            "category_label": "Movie & Cinema",
+            "file": "/usr/share/backgrounds/krypton/cinematic/cyberpunk-noir.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/cyberpunk-noir.png",
+            "desc": "Rain-slicked neon street with holographic advertisements."
+        },
+        {
+            "id": "emerald-matrix",
+            "name": "Matrix Cyberspace",
+            "category": "cinematic",
+            "category_label": "Movie & Cinema",
+            "file": "/usr/share/backgrounds/krypton/cinematic/emerald-matrix.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/emerald-matrix.png",
+            "desc": "Phosphor green digital matrix stream and cyberspace code."
+        },
+        {
+            "id": "krypton-shield",
+            "name": "Krypton Crystal Shield",
+            "category": "minimal",
+            "category_label": "Minimal & Distro",
+            "file": "/usr/share/backgrounds/krypton/minimal/krypton-default.png",
+            "thumb": "/usr/share/backgrounds/krypton/thumbs/krypton-default.png",
+            "desc": "Signature KryptonOS geometric crystal shield on mocha navy."
+        }
+    ]
+
+
+def get_current_wallpaper():
+    wall_file = os.path.expanduser("~/.config/hypr/.current_wallpaper")
+    if os.path.exists(wall_file):
+        try:
+            with open(wall_file, "r", encoding="utf-8") as f:
+                val = f.read().strip()
+                if val and os.path.exists(val):
+                    return val
+        except Exception:
+            pass
+    return "/usr/share/backgrounds/krypton/krypton-default.png"
+
+
 def load_current_theme():
     if os.path.exists(THEME_STATE_FILE):
         try:
@@ -215,7 +352,6 @@ def load_current_theme():
                 return json.load(f)
         except Exception:
             pass
-    # default
     return {
         "id": "catppuccin",
         "name": "Catppuccin Mocha",
@@ -231,11 +367,21 @@ def load_current_theme():
         "gaps_out": 12,
         "active_opacity": 1.0,
         "inactive_opacity": 0.95,
-        "generate_wallpaper": False,
+        "wallpaper": "/usr/share/backgrounds/krypton/anime/lofi-study.png",
+        "sync_wallpaper": True,
     }
 
 
-def save_and_apply_theme(theme_data):
+def apply_wallpaper(wall_path):
+    if not wall_path or not os.path.exists(wall_path):
+        return
+    try:
+        subprocess.run(["/usr/local/bin/krypton-wallpaper", wall_path], check=False)
+    except Exception:
+        pass
+
+
+def save_and_apply_theme(theme_data, update_wallpaper=True):
     os.makedirs(CONFIG_DIR, exist_ok=True)
     with open(THEME_STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(theme_data, f, indent=2)
@@ -336,29 +482,18 @@ url_color               {theme_data.get("secondary", "#89b4fa")}
     except Exception:
         pass
 
-    # 4. Optional Wallpaper gradient generation
-    if theme_data.get("generate_wallpaper", False):
-        try:
-            wall_path = os.path.expanduser("~/.cache/krypton-theme-wallpaper.png")
-            os.makedirs(os.path.dirname(wall_path), exist_ok=True)
-            acc = theme_data["accent"]
-            bg = theme_data["bg"]
-            subprocess.run([
-                "magick", "-size", "3840x2160",
-                f"radial-gradient:{acc}-{bg}",
-                wall_path
-            ], check=False)
-            # update hyprpaper / wallpaper
-            subprocess.run(["/usr/local/bin/krypton-wallpaper", wall_path], check=False)
-        except Exception:
-            pass
+    # 4. Update Wallpaper if requested
+    if update_wallpaper and theme_data.get("sync_wallpaper", True):
+        wall = theme_data.get("wallpaper")
+        if wall and os.path.exists(wall):
+            apply_wallpaper(wall)
 
     # 5. Notify user
     try:
         subprocess.run([
             "notify-send",
             "Theme Applied",
-            f"Activated '{theme_data.get('name', 'Custom Theme')}' across Hyprland, Waybar & Terminal.",
+            f"Activated '{theme_data.get('name', 'Custom Theme')}' across Hyprland, Waybar, Terminal & Wallpapers.",
             "--icon=preferences-desktop-theme",
             "-u", "normal"
         ], check=False)
@@ -369,11 +504,14 @@ url_color               {theme_data.get("secondary", "#89b4fa")}
 class ThemeManagerWindow(Gtk.Window):
     def __init__(self):
         super().__init__(title="Theme Studio")
-        self.set_default_size(940, 620)
+        self.set_default_size(980, 680)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.set_wmclass("krypton-themes", "krypton-themes")
 
         self.current_theme = load_current_theme()
+        self.wallpapers = load_wallpapers_catalog()
+        self.current_wallpaper = get_current_wallpaper()
+        self.selected_wall_category = "all"
 
         self.setup_header()
         self.setup_ui()
@@ -383,7 +521,7 @@ class ThemeManagerWindow(Gtk.Window):
         header = Gtk.HeaderBar()
         header.set_show_close_button(True)
         header.props.title = "Krypton Theme Studio"
-        header.props.subtitle = "Desktop Aesthetic & Color Customizer"
+        header.props.subtitle = "Themes, Wallpapers & Desktop Customizer"
 
         apply_btn = Gtk.Button(label="  Apply Theme")
         apply_icon = Gtk.Image.new_from_icon_name("emblem-ok-symbolic", Gtk.IconSize.BUTTON)
@@ -412,15 +550,19 @@ class ThemeManagerWindow(Gtk.Window):
 
         # Tab 1: Presets
         presets_widget = self.build_presets_tab()
-        stack.add_titled(presets_widget, "presets", "  Preset Themes  ")
+        stack.add_titled(presets_widget, "presets", "  🎨 Preset Themes  ")
 
-        # Tab 2: Custom Theme Studio
+        # Tab 2: Wallpapers
+        wallpapers_widget = self.build_wallpapers_tab()
+        stack.add_titled(wallpapers_widget, "wallpapers", "  🖼️ Wallpapers  ")
+
+        # Tab 3: Custom Theme Studio
         studio_widget = self.build_studio_tab()
-        stack.add_titled(studio_widget, "studio", "  Custom Studio  ")
+        stack.add_titled(studio_widget, "studio", "  🛠️ Colors Studio  ")
 
-        # Tab 3: Desktop Metrics & Gaps
+        # Tab 4: Desktop Metrics & Gaps
         layout_widget = self.build_layout_tab()
-        stack.add_titled(layout_widget, "layout", "  Tiling & Gaps  ")
+        stack.add_titled(layout_widget, "layout", "  📐 Tiling & Gaps  ")
 
         main_box.pack_start(stack, True, True, 0)
 
@@ -450,7 +592,7 @@ class ThemeManagerWindow(Gtk.Window):
     def create_theme_card(self, theme_id, info):
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         box.get_style_context().add_class("theme-card")
-        box.set_size_request(410, 160)
+        box.set_size_request(430, 190)
 
         # Top title & select button
         top_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
@@ -468,18 +610,29 @@ class ThemeManagerWindow(Gtk.Window):
         top_row.pack_end(sel_btn, False, False, 0)
         box.pack_start(top_row, False, False, 0)
 
-        # Description
+        # Middle Content Row (Details left, Wallpaper thumb right)
+        mid_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+
+        left_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
         desc_label = Gtk.Label(label=info["description"])
         desc_label.set_line_wrap(True)
-        desc_label.set_max_width_chars(45)
+        desc_label.set_max_width_chars(32)
         desc_label.set_halign(Gtk.Align.START)
         desc_label.get_style_context().add_class("dim-label")
-        box.pack_start(desc_label, False, False, 0)
+        left_vbox.pack_start(desc_label, False, False, 0)
+
+        # Wallpaper name tag
+        wall_tag = Gtk.Label()
+        w_name = info.get("wallpaper_name", "Krypton Default")
+        wall_tag.set_markup(f"<small>🖼️ <i>{w_name}</i></small>")
+        wall_tag.set_halign(Gtk.Align.START)
+        wall_tag.get_style_context().add_class("dim-label")
+        left_vbox.pack_start(wall_tag, False, False, 0)
 
         # Color Swatches Preview Pill
-        swatches_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        swatches_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=5)
         swatches_box.set_halign(Gtk.Align.START)
-        swatches_box.set_margin_top(8)
+        swatches_box.set_margin_top(4)
 
         colors_to_show = [
             info["accent"],
@@ -491,17 +644,31 @@ class ThemeManagerWindow(Gtk.Window):
 
         for color_hex in colors_to_show:
             sw = Gtk.DrawingArea()
-            sw.set_size_request(28, 28)
+            sw.set_size_request(24, 24)
             sw.connect("draw", self.draw_swatch_circle, color_hex)
             swatches_box.pack_start(sw, False, False, 0)
 
-        box.pack_start(swatches_box, False, False, 0)
+        left_vbox.pack_start(swatches_box, False, False, 0)
+        mid_row.pack_start(left_vbox, True, True, 0)
+
+        # Right side: Thumbnail preview
+        thumb_path = info.get("wallpaper_thumb")
+        if thumb_path and os.path.exists(thumb_path):
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb_path, 130, 74, True)
+                thumb_img = Gtk.Image.new_from_pixbuf(pixbuf)
+                thumb_img.get_style_context().add_class("wall-thumb-card")
+                mid_row.pack_end(thumb_img, False, False, 0)
+            except Exception:
+                pass
+
+        box.pack_start(mid_row, True, True, 0)
         return box
 
     def draw_swatch_circle(self, widget, cr, color_hex):
         r, g, b = hex_to_rgb(color_hex)
         cr.set_source_rgb(r / 255.0, g / 255.0, b / 255.0)
-        cr.arc(14, 14, 12, 0, 2 * 3.14159)
+        cr.arc(12, 12, 10, 0, 2 * 3.14159)
         cr.fill_preserve()
         cr.set_source_rgba(1.0, 1.0, 1.0, 0.2)
         cr.set_line_width(1.5)
@@ -511,17 +678,17 @@ class ThemeManagerWindow(Gtk.Window):
     def on_preset_activate(self, button, theme_id):
         t_data = THEMES[theme_id].copy()
         t_data["id"] = theme_id
-        # preserve current layout gaps & rounding preferences
         t_data["rounding"] = self.current_theme.get("rounding", 10)
         t_data["border_size"] = self.current_theme.get("border_size", 2)
         t_data["gaps_in"] = self.current_theme.get("gaps_in", 6)
         t_data["gaps_out"] = self.current_theme.get("gaps_out", 12)
         t_data["active_opacity"] = self.current_theme.get("active_opacity", 1.0)
         t_data["inactive_opacity"] = self.current_theme.get("inactive_opacity", 0.95)
+        t_data["sync_wallpaper"] = self.current_theme.get("sync_wallpaper", True)
 
         self.current_theme = t_data
-        save_and_apply_theme(t_data)
-        # Refresh window UI to show new active card
+        save_and_apply_theme(t_data, update_wallpaper=True)
+        self.current_wallpaper = get_current_wallpaper()
         self.rebuild_window()
 
     def rebuild_window(self):
@@ -530,6 +697,194 @@ class ThemeManagerWindow(Gtk.Window):
         self.setup_ui()
         self.show_all()
 
+    # =========================================================================
+    # Wallpapers Gallery Tab
+    # =========================================================================
+    def build_wallpapers_tab(self):
+        scroller = Gtk.ScrolledWindow()
+        scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=14)
+        vbox.set_margin_left(20)
+        vbox.set_margin_right(20)
+        vbox.set_margin_top(12)
+        vbox.set_margin_bottom(20)
+
+        # Control Bar: Categories & Actions
+        control_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+
+        # Filter Pills
+        categories = [
+            ("all", "All"),
+            ("landscape", "🌄 Landscape"),
+            ("anime", "🌸 Anime & Characters"),
+            ("cinematic", "🎬 Movie & Cinema"),
+            ("minimal", "✦ Minimal"),
+        ]
+        cat_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        for cat_id, cat_label in categories:
+            btn = Gtk.Button(label=cat_label)
+            if self.selected_wall_category == cat_id:
+                btn.get_style_context().add_class("suggested-action")
+            btn.connect("clicked", self.on_wall_category_selected, cat_id)
+            cat_box.pack_start(btn, False, False, 0)
+        control_bar.pack_start(cat_box, False, False, 0)
+
+        # Custom Wallpaper & Shuffle buttons on right
+        actions_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        
+        browse_btn = Gtk.Button(label="📁 Custom Image...")
+        browse_btn.connect("clicked", self.on_choose_custom_wallpaper)
+        actions_box.pack_end(browse_btn, False, False, 0)
+
+        shuffle_btn = Gtk.Button(label="🎲 Shuffle")
+        shuffle_btn.connect("clicked", self.on_shuffle_wallpaper)
+        actions_box.pack_end(shuffle_btn, False, False, 0)
+
+        control_bar.pack_end(actions_box, False, False, 0)
+        vbox.pack_start(control_bar, False, False, 0)
+
+        # Wallpapers Flow Grid
+        self.wall_flow = Gtk.FlowBox()
+        self.wall_flow.set_valign(Gtk.Align.START)
+        self.wall_flow.set_max_children_per_line(3)
+        self.wall_flow.set_min_children_per_line(3)
+        self.wall_flow.set_selection_mode(Gtk.SelectionMode.NONE)
+        self.wall_flow.set_column_spacing(16)
+        self.wall_flow.set_row_spacing(16)
+
+        filtered_walls = [
+            w for w in self.wallpapers
+            if self.selected_wall_category == "all" or w.get("category") == self.selected_wall_category
+        ]
+
+        for w_info in filtered_walls:
+            card = self.create_wallpaper_card(w_info)
+            self.wall_flow.add(card)
+
+        vbox.pack_start(self.wall_flow, True, True, 0)
+
+        # Options footer
+        footer_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        footer_box.set_margin_top(10)
+        sync_switch = Gtk.Switch()
+        sync_switch.set_active(self.current_theme.get("sync_wallpaper", True))
+        sync_switch.connect("notify::active", self.on_sync_wall_toggled)
+        sync_label = Gtk.Label(label="Automatically apply matching wallpaper when selecting preset themes")
+        footer_box.pack_start(sync_switch, False, False, 0)
+        footer_box.pack_start(sync_label, False, False, 0)
+        vbox.pack_start(footer_box, False, False, 0)
+
+        scroller.add(vbox)
+        return scroller
+
+    def create_wallpaper_card(self, info):
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        box.get_style_context().add_class("wall-card")
+        box.set_size_request(285, 230)
+
+        # Thumbnail Image
+        thumb_path = info.get("thumb", info.get("file"))
+        if thumb_path and os.path.exists(thumb_path):
+            try:
+                pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(thumb_path, 275, 150, True)
+                img = Gtk.Image.new_from_pixbuf(pixbuf)
+                img.get_style_context().add_class("wall-thumb")
+                box.pack_start(img, False, False, 0)
+            except Exception:
+                pass
+
+        # Meta row: Title + Category pill
+        meta_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        t_lbl = Gtk.Label()
+        t_lbl.set_markup(f"<b>{info.get('name', 'Wallpaper')}</b>")
+        t_lbl.set_halign(Gtk.Align.START)
+        t_lbl.set_ellipsize(3) # PANGO_ELLIPSIZE_END
+        meta_row.pack_start(t_lbl, True, True, 0)
+
+        cat_badge = Gtk.Label(label=f" {info.get('category_label', 'Art')} ")
+        cat_badge.get_style_context().add_class("badge")
+        meta_row.pack_end(cat_badge, False, False, 0)
+        box.pack_start(meta_row, False, False, 0)
+
+        # Action button
+        is_active = (self.current_wallpaper == info.get("file"))
+        set_btn = Gtk.Button(label="Active ✓" if is_active else "Set Wallpaper")
+        if is_active:
+            set_btn.set_sensitive(False)
+            box.get_style_context().add_class("active-card")
+        else:
+            set_btn.connect("clicked", self.on_set_wallpaper_clicked, info)
+        box.pack_start(set_btn, False, False, 0)
+
+        return box
+
+    def on_wall_category_selected(self, btn, cat_id):
+        self.selected_wall_category = cat_id
+        self.rebuild_window()
+
+    def on_set_wallpaper_clicked(self, btn, info):
+        wall_file = info.get("file")
+        if wall_file and os.path.exists(wall_file):
+            apply_wallpaper(wall_file)
+            self.current_wallpaper = wall_file
+            self.current_theme["wallpaper"] = wall_file
+            save_and_apply_theme(self.current_theme, update_wallpaper=False)
+            try:
+                subprocess.run([
+                    "notify-send",
+                    "Wallpaper Changed",
+                    f"Applied: {info.get('name', 'Custom Wallpaper')}",
+                    "--icon=preferences-desktop-wallpaper",
+                    "-u", "low"
+                ], check=False)
+            except Exception:
+                pass
+            self.rebuild_window()
+
+    def on_choose_custom_wallpaper(self, btn):
+        dialog = Gtk.FileChooserNative.new(
+            "Select Custom Wallpaper",
+            self,
+            Gtk.FileChooserAction.OPEN,
+            "_Select",
+            "_Cancel"
+        )
+        filter_img = Gtk.FileFilter()
+        filter_img.set_name("Images (*.png, *.jpg, *.jpeg, *.webp)")
+        filter_img.add_mime_type("image/png")
+        filter_img.add_mime_type("image/jpeg")
+        filter_img.add_mime_type("image/webp")
+        filter_img.add_pattern("*.png")
+        filter_img.add_pattern("*.jpg")
+        filter_img.add_pattern("*.jpeg")
+        filter_img.add_pattern("*.webp")
+        dialog.add_filter(filter_img)
+
+        res = dialog.run()
+        if res == Gtk.ResponseType.ACCEPT:
+            filename = dialog.get_filename()
+            if filename and os.path.exists(filename):
+                apply_wallpaper(filename)
+                self.current_wallpaper = filename
+                self.current_theme["wallpaper"] = filename
+                save_and_apply_theme(self.current_theme, update_wallpaper=False)
+                self.rebuild_window()
+        dialog.destroy()
+
+    def on_shuffle_wallpaper(self, btn):
+        if not self.wallpapers:
+            return
+        picked = random.choice(self.wallpapers)
+        self.on_set_wallpaper_clicked(None, picked)
+
+    def on_sync_wall_toggled(self, switch, gparam):
+        self.current_theme["sync_wallpaper"] = switch.get_active()
+        save_and_apply_theme(self.current_theme, update_wallpaper=False)
+
+    # =========================================================================
+    # Custom Theme Studio Tab
+    # =========================================================================
     def build_studio_tab(self):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -553,7 +908,6 @@ class ThemeManagerWindow(Gtk.Window):
             btn.connect("clicked", self.set_accent_color, hex_code)
             accent_box.pack_start(btn, False, False, 0)
 
-        # Custom Color Picker button
         color_btn = Gtk.ColorButton()
         r, g, b = hex_to_rgb(self.current_theme.get("accent", "#cba6f7"))
         color_btn.set_rgba(Gdk.RGBA(r / 255.0, g / 255.0, b / 255.0, 1.0))
@@ -591,19 +945,12 @@ class ThemeManagerWindow(Gtk.Window):
             bg_box.pack_start(btn, False, False, 0)
         vbox.pack_start(bg_box, False, False, 0)
 
-        # 4. Generate matching wallpaper toggle
-        wall_switch_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        wall_switch = Gtk.Switch()
-        wall_switch.set_active(self.current_theme.get("generate_wallpaper", False))
-        wall_switch.connect("notify::active", self.on_wall_switch_toggled)
-        wall_label = Gtk.Label(label="Auto-generate matching 4K gradient wallpaper on apply")
-        wall_switch_box.pack_start(wall_switch, False, False, 0)
-        wall_switch_box.pack_start(wall_label, False, False, 0)
-        vbox.pack_start(wall_switch_box, False, False, 0)
-
         scroller.add(vbox)
         return scroller
 
+    # =========================================================================
+    # Tiling & Gaps Tab
+    # =========================================================================
     def build_layout_tab(self):
         scroller = Gtk.ScrolledWindow()
         scroller.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
@@ -692,9 +1039,6 @@ class ThemeManagerWindow(Gtk.Window):
     def set_bg_color(self, btn, hex_code):
         self.current_theme["bg"] = hex_code
 
-    def on_wall_switch_toggled(self, switch, gparam):
-        self.current_theme["generate_wallpaper"] = switch.get_active()
-
     def on_rounding_changed(self, scale):
         self.current_theme["rounding"] = int(scale.get_value())
 
@@ -711,7 +1055,7 @@ class ThemeManagerWindow(Gtk.Window):
         self.current_theme["active_opacity"] = round(scale.get_value(), 2)
 
     def on_apply_clicked(self, btn):
-        save_and_apply_theme(self.current_theme)
+        save_and_apply_theme(self.current_theme, update_wallpaper=True)
 
     def apply_dark_css(self):
         css = b"""
@@ -725,20 +1069,35 @@ class ThemeManagerWindow(Gtk.Window):
             border-bottom: 1px solid rgba(203, 166, 247, 0.2);
             color: #cdd6f4;
         }
-        .theme-card {
+        .theme-card, .wall-card {
             background-color: #181825;
             border-radius: 12px;
-            padding: 16px;
+            padding: 14px;
             border: 1px solid rgba(255, 255, 255, 0.08);
             transition: all 200ms ease;
         }
-        .theme-card:hover {
+        .theme-card:hover, .wall-card:hover {
             border-color: rgba(203, 166, 247, 0.5);
-            background-color: #1f1f30;
+            background-color: #1f1f32;
         }
         .active-card {
             border: 2px solid #cba6f7;
-            background-color: #1f1f35;
+            background-color: #1f1f38;
+        }
+        .wall-thumb {
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .wall-thumb-card {
+            border-radius: 8px;
+            border: 1px solid rgba(203, 166, 247, 0.25);
+        }
+        .badge {
+            background-color: rgba(203, 166, 247, 0.18);
+            color: #cba6f7;
+            font-size: 10px;
+            border-radius: 6px;
+            padding: 2px 6px;
         }
         .dim-label {
             color: #a6adc8;

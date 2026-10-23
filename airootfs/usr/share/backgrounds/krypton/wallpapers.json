@@ -1,0 +1,101 @@
+[
+  {
+    "id": "lofi-study",
+    "name": "Lofi Night Study",
+    "category": "anime",
+    "category_label": "Anime Aesthetic",
+    "file": "/usr/share/backgrounds/krypton/anime/lofi-study.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/lofi-study.png",
+    "theme_match": "catppuccin",
+    "accent": "#cba6f7",
+    "desc": "Warm anime study desk with steaming tea, code, and rain outside."
+  },
+  {
+    "id": "cyber-samurai",
+    "name": "Neo-Tokyo Cyber Samurai",
+    "category": "anime",
+    "category_label": "Anime & Characters",
+    "file": "/usr/share/backgrounds/krypton/anime/cyber-samurai.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/cyber-samurai.png",
+    "theme_match": "tokyo-night",
+    "accent": "#7aa2f7",
+    "desc": "Futuristic ronin warrior looking over neon-lit skyscraper holograms."
+  },
+  {
+    "id": "sakura-fuji",
+    "name": "Sakura Mount Fuji",
+    "category": "anime",
+    "category_label": "Anime Aesthetic",
+    "file": "/usr/share/backgrounds/krypton/anime/sakura-fuji.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/sakura-fuji.png",
+    "theme_match": "rose-pine",
+    "accent": "#ebbcba",
+    "desc": "Delicate cherry blossoms and glowing lanterns at twilight."
+  },
+  {
+    "id": "nordic-aurora",
+    "name": "Arctic Aurora Borealis",
+    "category": "landscape",
+    "category_label": "Landscape",
+    "file": "/usr/share/backgrounds/krypton/landscapes/nordic-aurora.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/nordic-aurora.png",
+    "theme_match": "nord",
+    "accent": "#88c0d0",
+    "desc": "Emerald mountain lake reflecting vibrant northern lights."
+  },
+  {
+    "id": "desert-dunes",
+    "name": "Golden Desert Horizon",
+    "category": "landscape",
+    "category_label": "Landscape",
+    "file": "/usr/share/backgrounds/krypton/landscapes/desert-dunes.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/desert-dunes.png",
+    "theme_match": "gruvbox",
+    "accent": "#fabd2f",
+    "desc": "Serene rolling dunes with warm violet and amber sunset."
+  },
+  {
+    "id": "interstellar-astronaut",
+    "name": "Interstellar Cosmic Explorer",
+    "category": "cinematic",
+    "category_label": "Movie & Characters",
+    "file": "/usr/share/backgrounds/krypton/cinematic/interstellar-astronaut.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/interstellar-astronaut.png",
+    "theme_match": "dracula",
+    "accent": "#bd93f9",
+    "desc": "Sci-fi explorer standing before an immense cosmic nebula."
+  },
+  {
+    "id": "cyberpunk-noir",
+    "name": "Blade Runner Neo-Noir",
+    "category": "cinematic",
+    "category_label": "Movie & Cinema",
+    "file": "/usr/share/backgrounds/krypton/cinematic/cyberpunk-noir.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/cyberpunk-noir.png",
+    "theme_match": "cyberpunk",
+    "accent": "#00f0ff",
+    "desc": "Rain-slicked neon street with holographic advertisements."
+  },
+  {
+    "id": "emerald-matrix",
+    "name": "Matrix Cyberspace",
+    "category": "cinematic",
+    "category_label": "Movie & Cinema",
+    "file": "/usr/share/backgrounds/krypton/cinematic/emerald-matrix.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/emerald-matrix.png",
+    "theme_match": "emerald",
+    "accent": "#00ff9f",
+    "desc": "Phosphor green digital matrix stream and cyberspace code."
+  },
+  {
+    "id": "krypton-shield",
+    "name": "Krypton Crystal Shield",
+    "category": "minimal",
+    "category_label": "Minimal & Distro",
+    "file": "/usr/share/backgrounds/krypton/minimal/krypton-default.png",
+    "thumb": "/usr/share/backgrounds/krypton/thumbs/krypton-default.png",
+    "theme_match": "catppuccin",
+    "accent": "#cba6f7",
+    "desc": "Signature KryptonOS geometric crystal shield on mocha navy."
+  }
+]
