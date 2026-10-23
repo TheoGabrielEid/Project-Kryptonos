@@ -177,6 +177,9 @@ breeze-icons
 qt5ct
 qt6ct
 
+# Virtualization Guest Drivers
+open-vm-tools
+
 # Power Management, Printing & Containers
 power-profiles-daemon
 upower
