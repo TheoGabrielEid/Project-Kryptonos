@@ -1,15 +1,21 @@
 {
     "layer": "top",
     "position": "top",
-    "margin-top": 8,
+    "margin-top": 0,
     "margin-left": 14,
     "margin-right": 14,
     "height": 38,
     "spacing": 8,
     "modules-left": [
         "custom/launcher",
+        "custom/files",
+        "custom/browser",
+        "custom/terminal",
         "hyprland/workspaces",
-        "hyprland/window"
+        "hyprland/window",
+        "custom/win-min",
+        "custom/win-max",
+        "custom/win-close"
     ],
     "modules-center": [
         "clock"
@@ -21,12 +27,46 @@
         "memory",
         "battery",
         "tray",
+        "custom/settings",
         "custom/power"
     ],
     "custom/launcher": {
-        "format": "  ",
+        "format": " ⬢  KRYPTON ",
         "on-click": "rofi -show drun",
-        "tooltip": false
+        "tooltip-format": "KryptonOS App Launcher (Super+Space)"
+    },
+    "custom/files": {
+        "format": "   Files ",
+        "on-click": "thunar",
+        "on-click-right": "kitty -e yazi",
+        "tooltip-format": "File Explorer — Left click: Thunar GUI | Right click: Yazi Terminal File Manager (Super+E)"
+    },
+    "custom/browser": {
+        "format": " 󰈹  Helium ",
+        "on-click": "helium-browser",
+        "tooltip-format": "Helium Browser (Super+B)"
+    },
+    "custom/terminal": {
+        "format": "  ",
+        "on-click": "kitty",
+        "tooltip-format": "Kitty Terminal (Super+Return)"
+    },
+    "custom/win-min": {
+        "format": " 󰖰 ",
+        "on-click": "/usr/local/bin/krypton-win-ctl minimize",
+        "on-click-right": "/usr/local/bin/krypton-win-ctl restore",
+        "tooltip-format": "Minimize Active App (Left-click) | Restore Minimized App (Right-click or Super+M)"
+    },
+    "custom/win-max": {
+        "format": " 󰊓 ",
+        "on-click": "/usr/local/bin/krypton-win-ctl fullscreen",
+        "on-click-right": "/usr/local/bin/krypton-win-ctl maximize",
+        "tooltip-format": "Full Screen Active App (Left-click or Super+F) | Maximize Tiled (Right-click)"
+    },
+    "custom/win-close": {
+        "format": " 󰅖 ",
+        "on-click": "/usr/local/bin/krypton-win-ctl close",
+        "tooltip-format": "Exit / Close Active App (Super+Q)"
     },
     "hyprland/workspaces": {
         "format": "{icon}",
@@ -76,6 +116,11 @@
         "format-charging": "󰂄 {capacity}%",
         "format-plugged": " {capacity}%",
         "format-icons": ["󰂃", "󰁺", "󰁻", "󰁼", "󰁽", "󰁾", "󰁿", "󰂀", "󰂁", "󰂂", "󰁹"]
+    },
+    "custom/settings": {
+        "format": " ",
+        "on-click": "/usr/local/bin/krypton-settings",
+        "tooltip-format": "KryptonOS System Settings (Display, FPS, Audio)"
     },
     "custom/power": {
         "format": " ",

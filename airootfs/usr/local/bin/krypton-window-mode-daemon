@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""
+KryptonOS Window Mode Daemon (Disabled - Using Native Hyprland Tiling)
+"""
+import sys
+sys.exit(0)

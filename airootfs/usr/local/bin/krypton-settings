@@ -1,0 +1,976 @@
+#!/usr/bin/env python3
+"""
+KryptonOS System Settings (GTK 3.0 + Catppuccin Mocha Dark Theme)
+Uses GTK 3.0 (identical to blueman-manager with OpenGL/Cairo Wayland rendering)
+so it launches reliably on VMware svga/vmwgfx without Vulkan driver crashes.
+"""
+import glob
+import json
+import os
+import re
+import subprocess
+import sys
+import traceback
+
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gtk, Gdk, Gio, GLib
+
+RESOLUTIONS = [
+    ("2560x1600 (16:10 WQXGA - Native Fullscreen)", "2560x1600"),
+    ("2560x1440 (16:9 QHD)", "2560x1440"),
+    ("1920x1200 (16:10 WUXGA - Default Fullscreen)", "1920x1200"),
+    ("1920x1080 (16:9 Full HD)", "1920x1080"),
+    ("1707x1067 (Windowed Host Scaled)", "1707x1067"),
+    ("1680x1050 (16:10 WSXGA+)", "1680x1050"),
+    ("1600x900 (16:9 HD+)", "1600x900"),
+    ("1440x900 (16:10 WXGA+)", "1440x900"),
+    ("1366x768 (16:9 WXGA)", "1366x768"),
+    ("1280x800 (16:10 WXGA)", "1280x800"),
+    ("3840x2160 (16:9 4K UHD)", "3840x2160"),
+    ("Auto / Preferred", "preferred"),
+]
+
+REFRESH_RATES = [
+    ("240 Hz (Ultra Smooth)", "240"),
+    ("165 Hz (High Refresh)", "165"),
+    ("144 Hz (Gaming)", "144"),
+    ("120 Hz (Smooth)", "120"),
+    ("75 Hz", "75"),
+    ("60 Hz (Standard)", "60"),
+]
+
+SCALES = [
+    ("100% (1.0x - Crisp / Maximum Workspace)", "1"),
+    ("125% (1.25x - Balanced)", "1.25"),
+    ("150% (1.5x - Large HiDPI)", "1.5"),
+    ("200% (2.0x - Extra Large)", "2"),
+]
+
+DEFAULT_WALLPAPERS = [
+    ("💎 KryptonOS Crystal Shield (Signature Default)", "/usr/share/backgrounds/krypton/krypton-default.png"),
+    ("KryptonOS Catppuccin Abstract", "/usr/share/backgrounds/krypton/wallpaper.png"),
+    ("KryptonOS Cyber Neon", "/usr/share/backgrounds/krypton/cyber-neon.png"),
+    ("KryptonOS Deep Space", "/usr/share/backgrounds/krypton/deep-space.png"),
+    ("KryptonOS Emerald Grid", "/usr/share/backgrounds/krypton/emerald-grid.png"),
+    ("Hyprland Signature Dawn", "/usr/share/hypr/wall0.png"),
+    ("Hyprland Signature Night", "/usr/share/hypr/wall1.png"),
+    ("Hyprland Signature Anime", "/usr/share/hypr/wall2.png"),
+]
+
+CATPPUCCIN_CSS = b"""
+window {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+}
+headerbar {
+    background-color: #181825;
+    color: #cdd6f4;
+    border-bottom: 1px solid #313244;
+}
+.card {
+    background-color: #181825;
+    border: 1px solid #313244;
+    border-radius: 12px;
+    padding: 16px;
+}
+.section-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #cba6f7;
+}
+.row-title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #cdd6f4;
+}
+.row-subtitle {
+    font-size: 12px;
+    color: #a6adc8;
+}
+.status-banner {
+    background-color: #313244;
+    color: #a6e3a1;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-weight: bold;
+}
+button.primary-btn {
+    background-image: none;
+    background-color: #cba6f7;
+    color: #11111b;
+    font-weight: bold;
+    border-radius: 8px;
+    padding: 6px 16px;
+    border: none;
+}
+button.primary-btn:hover {
+    background-color: #b4befe;
+}
+button.action-btn {
+    background-image: none;
+    background-color: #313244;
+    color: #cdd6f4;
+    font-weight: bold;
+    border-radius: 8px;
+    padding: 6px 14px;
+    border: 1px solid #45475a;
+}
+button.action-btn:hover {
+    background-color: #45475a;
+}
+.mode-card {
+    background-color: #181825;
+    border: 2px solid #313244;
+    border-radius: 14px;
+    padding: 16px;
+}
+.mode-card-active {
+    background-color: #1e1e2e;
+    border: 2px solid #cba6f7;
+    border-radius: 14px;
+    padding: 16px;
+}
+.mode-preview-box {
+    background-color: #11111b;
+    border-radius: 10px;
+    padding: 12px;
+}
+entry {
+    background-color: #181825;
+    color: #cdd6f4;
+    border: 1px solid #45475a;
+    border-radius: 8px;
+    padding: 8px 12px;
+}
+entry:focus {
+    border-color: #cba6f7;
+}
+"""
+
+
+def run_cmd(cmd):
+    try:
+        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+        return res.stdout.strip()
+    except Exception:
+        return ""
+
+
+def get_monitors():
+    out = run_cmd("hyprctl monitors -j")
+    try:
+        data = json.loads(out)
+        if isinstance(data, list) and len(data) > 0:
+            return data
+    except Exception:
+        pass
+    return [{"name": "Virtual-1", "width": 1920, "height": 1200, "refreshRate": 60.0, "scale": 1.0}]
+
+
+def get_persistence_status():
+    out = run_cmd("df -h /run/archiso/cowspace 2>/dev/null | tail -n 1")
+    if "/dev/nvme" in out or "/dev/sd" in out or "/dev/vd" in out:
+        parts = out.split()
+        dev = parts[0] if parts else "Disk"
+        size = parts[1] if len(parts) > 1 else "64G"
+        used = parts[2] if len(parts) > 2 else ""
+        return f"Permanent Disk Persistence Active ({dev} — {used} used of {size})"
+    return "Permanent Disk Overlay Active"
+
+
+def make_section(title, subtitle=""):
+    box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+    box.get_style_context().add_class("card")
+    lbl = Gtk.Label(label=title, xalign=0)
+    lbl.get_style_context().add_class("section-title")
+    box.pack_start(lbl, False, False, 0)
+    if subtitle:
+        sub = Gtk.Label(label=subtitle, xalign=0)
+        sub.get_style_context().add_class("row-subtitle")
+        box.pack_start(sub, False, False, 0)
+    return box
+
+
+def make_row(title, subtitle, widget):
+    row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+    row.set_margin_top(4)
+    row.set_margin_bottom(4)
+    vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+    t = Gtk.Label(label=title, xalign=0)
+    t.get_style_context().add_class("row-title")
+    vbox.pack_start(t, False, False, 0)
+    if subtitle:
+        s = Gtk.Label(label=subtitle, xalign=0)
+        s.get_style_context().add_class("row-subtitle")
+        vbox.pack_start(s, False, False, 0)
+    row.pack_start(vbox, True, True, 0)
+    widget.set_valign(Gtk.Align.CENTER)
+    row.pack_end(widget, False, False, 0)
+    return row
+
+
+class KryptonSettingsWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="KryptonOS System Settings")
+        self.set_wmclass("krypton-settings", "KryptonSettings")
+        self.set_default_size(860, 660)
+        self.set_position(Gtk.WindowPosition.CENTER)
+
+        self.monitors = get_monitors()
+        self.active_monitor = self.monitors[0].get("name", "Virtual-1")
+
+        # HeaderBar + StackSwitcher (with explicit Minimize, Maximize/Fullscreen, and Close buttons)
+        header = Gtk.HeaderBar()
+        header.set_show_close_button(False)
+        self.stack = Gtk.Stack()
+        self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
+        switcher = Gtk.StackSwitcher()
+        switcher.set_stack(self.stack)
+        header.set_custom_title(switcher)
+
+        close_btn = Gtk.Button(label="✕")
+        close_btn.set_tooltip_text("Close / Exit Settings")
+        close_btn.get_style_context().add_class("action-btn")
+        close_btn.connect("clicked", lambda _: self.close())
+
+        max_btn = Gtk.Button(label="🗖")
+        max_btn.set_tooltip_text("Maximize / Fullscreen")
+        max_btn.get_style_context().add_class("action-btn")
+        max_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"]))
+
+        min_btn = Gtk.Button(label="🗕")
+        min_btn.set_tooltip_text("Minimize Window")
+        min_btn.get_style_context().add_class("action-btn")
+        min_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"]))
+
+        header.pack_end(close_btn)
+        header.pack_end(max_btn)
+        header.pack_end(min_btn)
+        self.set_titlebar(header)
+
+        main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(main_vbox)
+
+        self.status_label = Gtk.Label(
+            label="💎 KryptonOS Control Center — Changes apply live & save permanently to disk",
+            xalign=0.5,
+        )
+        self.status_label.get_style_context().add_class("status-banner")
+        self.status_label.set_margin_top(10)
+        self.status_label.set_margin_start(16)
+        self.status_label.set_margin_end(16)
+        main_vbox.pack_start(self.status_label, False, False, 0)
+
+        main_vbox.pack_start(self.stack, True, True, 0)
+
+        self.build_coding_workspace_page()
+        self.build_display_page()
+        self.build_wallpaper_page()
+        self.build_performance_page()
+        self.build_users_page()
+        self.build_system_page()
+
+    def notify(self, msg):
+        self.status_label.set_text(f"✅  {msg}")
+        subprocess.Popen(f"notify-send 'KryptonOS Settings' '{msg}' --icon=preferences-system", shell=True)
+
+    def wrap_scrolled(self, content_box):
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        content_box.set_margin_top(14)
+        content_box.set_margin_bottom(20)
+        content_box.set_margin_start(18)
+        content_box.set_margin_end(18)
+        scrolled.add(content_box)
+        return scrolled
+
+    def build_coding_workspace_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        intro = make_section(
+            "Coding Workspace",
+            "Hyprland remains the desktop compositor. Applications open as floating windows so your editor, terminal, browser, and documentation can overlap and keep independent sizes.",
+        )
+        page.pack_start(intro, False, False, 0)
+
+        tools = make_section(
+            "Developer Tools",
+            "Launch the coding tools from the dock or use these shortcuts.",
+        )
+        shortcuts = [
+            ("Code editor", "Open Visual Studio Code", "Super + C"),
+            ("Terminal", "Open Kitty for shells, builds, and debugging", "Super + Return"),
+            ("Git client", "Open LazyGit in Kitty", "Super + G"),
+            ("System monitor", "Inspect CPU and memory usage", "Super + T"),
+            ("File manager", "Browse project files", "Super + E"),
+            ("Application search", "Find installed developer tools", "Super + Space"),
+        ]
+        for title, subtitle, badge_text in shortcuts:
+            badge = Gtk.Label(label=f" {badge_text} ")
+            badge.get_style_context().add_class("status-banner")
+            tools.pack_start(make_row(title, subtitle, badge), False, False, 0)
+        page.pack_start(tools, False, False, 0)
+
+        self.stack.add_titled(self.wrap_scrolled(page), "coding_workspace", "Coding Workspace")
+    def build_display_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        sec1 = make_section(
+            "Monitor, Resolution & Refresh Rate (FPS)",
+            f"Active Output: {self.active_monitor} — Saved permanently across reboots.",
+        )
+
+        self.res_combo = Gtk.ComboBoxText()
+        for label, _ in RESOLUTIONS:
+            self.res_combo.append_text(label)
+        self.res_combo.set_active(2)
+
+        self.fps_combo = Gtk.ComboBoxText()
+        for label, _ in REFRESH_RATES:
+            self.fps_combo.append_text(label)
+        self.fps_combo.set_active(5)
+
+        self.scale_combo = Gtk.ComboBoxText()
+        for label, _ in SCALES:
+            self.scale_combo.append_text(label)
+        self.scale_combo.set_active(0)
+
+        cur_w = self.monitors[0].get("width", 1920)
+        cur_h = self.monitors[0].get("height", 1200)
+        cur_res = f"{cur_w}x{cur_h}"
+        for idx, (_, val) in enumerate(RESOLUTIONS):
+            if val == cur_res:
+                self.res_combo.set_active(idx)
+                break
+
+        cur_fps = str(int(round(self.monitors[0].get("refreshRate", 60))))
+        for idx, (_, val) in enumerate(REFRESH_RATES):
+            if val == cur_fps:
+                self.fps_combo.set_active(idx)
+                break
+
+        sec1.pack_start(make_row("Screen Resolution", "Choose resolution or fit to entire screen", self.res_combo), False, False, 0)
+        sec1.pack_start(make_row("Refresh Rate / Target FPS", "Set display refresh rate (Hz / FPS)", self.fps_combo), False, False, 0)
+        sec1.pack_start(make_row("Display Scaling (HiDPI)", "Adjust UI & text sharpness", self.scale_combo), False, False, 0)
+
+        apply_btn = Gtk.Button(label="Apply & Save Permanently")
+        apply_btn.get_style_context().add_class("primary-btn")
+        apply_btn.connect("clicked", self.on_apply_display)
+        sec1.pack_start(make_row("Apply Display Configuration", "Updates live session & saves to hyprland.lua", apply_btn), False, False, 0)
+        page.pack_start(sec1, False, False, 0)
+
+        sec2 = make_section("One-Click Fullscreen Presets", "Instant presets for your display")
+        presets = [
+            ("Fit Native Fullscreen (2560x1600 @ 240Hz)", "2560x1600", "240", "1"),
+            ("Fit Native Fullscreen HiDPI (2560x1600 @ 240Hz, 1.25x Scale)", "2560x1600", "240", "1.25"),
+            ("Fit 16:10 Fullscreen (1920x1200 @ 120Hz)", "1920x1200", "120", "1"),
+            ("Fit 16:9 Full HD (1920x1080 @ 120Hz)", "1920x1080", "120", "1"),
+        ]
+        for title, res, fps, scale in presets:
+            btn = Gtk.Button(label="Activate")
+            btn.get_style_context().add_class("action-btn")
+            btn.connect("clicked", lambda _, r=res, f=fps, s=scale: self.apply_display_values(r, f, s))
+            sec2.pack_start(make_row(title, f"{res} @ {fps}Hz (Scale {scale}x)", btn), False, False, 0)
+        page.pack_start(sec2, False, False, 0)
+
+        self.stack.add_titled(self.wrap_scrolled(page), "display", "Display & FPS")
+
+    def build_wallpaper_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        sec1 = make_section(
+            "KryptonOS Wallpapers",
+            "Click 'Set Wallpaper' to apply immediately and save permanently across reboots.",
+        )
+
+        for title, path in DEFAULT_WALLPAPERS:
+            if not os.path.exists(path):
+                continue
+            btn = Gtk.Button(label="Set Wallpaper")
+            btn.get_style_context().add_class("primary-btn" if "Crystal Shield" in title else "action-btn")
+            btn.connect("clicked", lambda _, p=path, t=title: self.set_wallpaper(p, t))
+            sec1.pack_start(make_row(title, path, btn), False, False, 0)
+        page.pack_start(sec1, False, False, 0)
+
+        sec2 = make_section(
+            "Custom Wallpapers (~/Pictures/Wallpapers)",
+            "Place any PNG/JPG image in ~/Pictures/Wallpapers to use your own wallpaper.",
+        )
+        user_wall_dir = os.path.expanduser("~/Pictures/Wallpapers")
+        os.makedirs(user_wall_dir, exist_ok=True)
+        for ext in ("*.png", "*.jpg", "*.jpeg", "*.webp"):
+            for img in sorted(glob.glob(os.path.join(user_wall_dir, ext))):
+                name = os.path.basename(img)
+                btn = Gtk.Button(label="Set Wallpaper")
+                btn.get_style_context().add_class("action-btn")
+                btn.connect("clicked", lambda _, p=img, t=name: self.set_wallpaper(p, t))
+                sec2.pack_start(make_row(name, img, btn), False, False, 0)
+
+        open_btn = Gtk.Button(label="Open Folder in Thunar")
+        open_btn.get_style_context().add_class("action-btn")
+        open_btn.connect("clicked", lambda _: subprocess.Popen(f"thunar '{user_wall_dir}'", shell=True))
+        sec2.pack_start(make_row("Open Wallpapers Folder", user_wall_dir, open_btn), False, False, 0)
+        page.pack_start(sec2, False, False, 0)
+
+        self.stack.add_titled(self.wrap_scrolled(page), "wallpapers", "Wallpapers")
+
+    def set_wallpaper(self, path, title):
+        hp_conf = os.path.expanduser("~/.config/hypr/hyprpaper.conf")
+        os.makedirs(os.path.dirname(hp_conf), exist_ok=True)
+        conf_text = (
+            "# KryptonOS Wallpaper Configuration (hyprpaper 0.8+)\n"
+            "splash = false\n"
+            "ipc = true\n\n"
+            "wallpaper {\n"
+            "    monitor = \n"
+            f"    path = {path}\n"
+            "    fit_mode = cover\n"
+            "}\n"
+        )
+        try:
+            with open(hp_conf, "w", encoding="utf-8") as f:
+                f.write(conf_text)
+        except Exception:
+            pass
+
+        subprocess.Popen(f"/usr/local/bin/krypton-wallpaper '{path}'", shell=True)
+        subprocess.run("sync", shell=True)
+        self.notify(f"Wallpaper set to: {title}")
+
+    def build_performance_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        sec = make_section("Compositor & Graphics Performance", "Live toggles for FPS, VFR, Blur, and Animations")
+
+        toggles = [
+            ("Variable Frame Rate (VFR)", "Reduces GPU usage when screen is idle", "misc:vfr", True),
+            ("Smooth Window Animations", "Disable for ultra-low latency / maximum FPS", "animations:enabled", True),
+            ("Background Blur (Frosted Glass)", "Disable to boost FPS in virtual machines", "decoration:blur:enabled", True),
+            ("Window Drop Shadows", "Toggle Catppuccin window glow & shadows", "decoration:shadow:enabled", True),
+        ]
+        for title, sub, key, default_val in toggles:
+            sw = Gtk.Switch()
+            sw.set_active(default_val)
+            sw.connect(
+                "notify::active",
+                lambda s, _, k=key: self.set_hypr_keyword(k, "true" if s.get_active() else "false"),
+            )
+            sec.pack_start(make_row(title, sub, sw), False, False, 0)
+
+        gaps_spin = Gtk.SpinButton.new_with_range(0, 32, 2)
+        gaps_spin.set_value(12)
+        gaps_spin.connect(
+            "value-changed",
+            lambda sp: self.set_hypr_keyword("general:gaps_out", str(int(sp.get_value()))),
+        )
+        sec.pack_start(make_row("Outer Window Gaps (px)", "Set to 0 to maximize screen space", gaps_spin), False, False, 0)
+
+        round_spin = Gtk.SpinButton.new_with_range(0, 24, 2)
+        round_spin.set_value(12)
+        round_spin.connect(
+            "value-changed",
+            lambda sp: self.set_hypr_keyword("decoration:rounding", str(int(sp.get_value()))),
+        )
+        sec.pack_start(make_row("Window Corner Rounding (px)", "Adjust rounded window corners", round_spin), False, False, 0)
+
+        page.pack_start(sec, False, False, 0)
+        self.stack.add_titled(self.wrap_scrolled(page), "performance", "Performance & Effects")
+
+    def build_users_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        # Section 1: Create New User Account with Password
+        sec_new = make_section(
+            "Create New User Account",
+            "Add a new user with a secure password and full admin / sudo privileges.",
+        )
+
+        self.new_user_entry = Gtk.Entry()
+        self.new_user_entry.set_placeholder_text("e.g. john, alex, dev")
+        sec_new.pack_start(make_row("Username", "Letters, numbers, underscores and hyphens", self.new_user_entry), False, False, 0)
+
+        self.new_pass_entry = Gtk.Entry()
+        self.new_pass_entry.set_visibility(False)
+        self.new_pass_entry.set_placeholder_text("Enter password or click Generate")
+
+        pass_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        pass_box.pack_start(self.new_pass_entry, True, True, 0)
+
+        gen_btn = Gtk.Button(label="🎲 Generate")
+        gen_btn.get_style_context().add_class("action-btn")
+        gen_btn.connect("clicked", lambda _: self.generate_password_for_entry(self.new_pass_entry))
+        pass_box.pack_start(gen_btn, False, False, 0)
+
+        sec_new.pack_start(make_row("Account Password", "Set login and sudo password for this user", pass_box), False, False, 0)
+
+        create_btn = Gtk.Button(label="➕ Create User Account")
+        create_btn.get_style_context().add_class("primary-btn")
+        create_btn.connect("clicked", self.on_create_user_clicked)
+
+        btn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        btn_row.set_margin_top(6)
+        btn_row.pack_end(create_btn, False, False, 0)
+        sec_new.pack_start(btn_row, False, False, 0)
+        page.pack_start(sec_new, False, False, 0)
+
+        # Section 2: Change Password for Existing User
+        sec_change = make_section(
+            "Change User Password",
+            "Update the password for any existing user on this system (saved to persistent disk).",
+        )
+
+        self.change_user_combo = Gtk.ComboBoxText()
+        self.refresh_user_list()
+        sec_change.pack_start(make_row("Select User", "Choose user account to update password", self.change_user_combo), False, False, 0)
+
+        self.change_pass_entry = Gtk.Entry()
+        self.change_pass_entry.set_visibility(False)
+        self.change_pass_entry.set_placeholder_text("Enter new password or click Generate")
+
+        cpass_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        cpass_box.pack_start(self.change_pass_entry, True, True, 0)
+
+        cgen_btn = Gtk.Button(label="🎲 Generate")
+        cgen_btn.get_style_context().add_class("action-btn")
+        cgen_btn.connect("clicked", lambda _: self.generate_password_for_entry(self.change_pass_entry))
+        cpass_box.pack_start(cgen_btn, False, False, 0)
+
+        sec_change.pack_start(make_row("New Password", "New password for the selected account", cpass_box), False, False, 0)
+
+        update_btn = Gtk.Button(label="🔑 Update Password")
+        update_btn.get_style_context().add_class("primary-btn")
+        update_btn.connect("clicked", self.on_update_password_clicked)
+
+        ubtn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        ubtn_row.set_margin_top(6)
+        ubtn_row.pack_end(update_btn, False, False, 0)
+        sec_change.pack_start(ubtn_row, False, False, 0)
+        page.pack_start(sec_change, False, False, 0)
+
+        # Section 3: Delete User Password or Account (Requires Current Password Verification)
+        sec_delete = make_section(
+            "Delete User Password / Delete Account (Password Protected)",
+            "Enter the user's current password to authorize deleting their password or account.",
+        )
+
+        self.del_user_combo = Gtk.ComboBoxText()
+        sec_delete.pack_start(
+            make_row("Select User", "Choose user account to delete password or remove", self.del_user_combo),
+            False,
+            False,
+            0,
+        )
+
+        self.verify_pass_entry = Gtk.Entry()
+        self.verify_pass_entry.set_visibility(False)
+        self.verify_pass_entry.set_placeholder_text("Enter user's CURRENT password to verify")
+
+        vpass_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        vpass_box.pack_start(self.verify_pass_entry, True, True, 0)
+
+        show_vpass_btn = Gtk.ToggleButton(label="👁")
+        show_vpass_btn.get_style_context().add_class("action-btn")
+        show_vpass_btn.connect(
+            "toggled",
+            lambda b: self.verify_pass_entry.set_visibility(b.get_active()),
+        )
+        vpass_box.pack_start(show_vpass_btn, False, False, 0)
+
+        sec_delete.pack_start(
+            make_row("Verify Current Password", "Required before deleting password or account", vpass_box),
+            False,
+            False,
+            0,
+        )
+
+        del_pass_btn = Gtk.Button(label="🔓 Delete User Password")
+        del_pass_btn.get_style_context().add_class("action-btn")
+        del_pass_btn.connect("clicked", self.on_delete_password_clicked)
+
+        del_user_btn = Gtk.Button(label="🗑️ Delete User Account")
+        del_user_btn.get_style_context().add_class("action-btn")
+        del_user_btn.connect("clicked", self.on_delete_user_clicked)
+
+        dbtn_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        dbtn_row.set_margin_top(6)
+        dbtn_row.pack_end(del_user_btn, False, False, 0)
+        dbtn_row.pack_end(del_pass_btn, False, False, 0)
+        sec_delete.pack_start(dbtn_row, False, False, 0)
+        page.pack_start(sec_delete, False, False, 0)
+
+        # Section 4: Secure Password Generator Utility
+        sec_gen = make_section(
+            "Password Generator Utility",
+            "Generate cryptographically strong passwords and copy them with one click.",
+        )
+
+        self.gen_output_entry = Gtk.Entry()
+        self.gen_output_entry.set_editable(False)
+        self.gen_output_entry.set_text(self.generate_secure_password(16))
+
+        gen_row_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        gen_row_box.pack_start(self.gen_output_entry, True, True, 0)
+
+        regen_btn = Gtk.Button(label="🔄 New Password")
+        regen_btn.get_style_context().add_class("action-btn")
+        regen_btn.connect("clicked", lambda _: self.gen_output_entry.set_text(self.generate_secure_password(16)))
+        gen_row_box.pack_start(regen_btn, False, False, 0)
+
+        copy_btn = Gtk.Button(label="📋 Copy")
+        copy_btn.get_style_context().add_class("primary-btn")
+        copy_btn.connect("clicked", lambda _: self.copy_to_clipboard(self.gen_output_entry.get_text()))
+        gen_row_box.pack_start(copy_btn, False, False, 0)
+
+        sec_gen.pack_start(make_row("Generated Password", "16-character alphanumeric + symbol password", gen_row_box), False, False, 0)
+        page.pack_start(sec_gen, False, False, 0)
+
+        self.refresh_user_list()
+        self.stack.add_titled(self.wrap_scrolled(page), "users", "Users & Passwords")
+
+    def generate_secure_password(self, length=16):
+        import secrets
+        import string
+        alphabet = string.ascii_letters + string.digits + "!@#$%&*-_=+"
+        return "".join(secrets.choice(alphabet) for _ in range(length))
+
+    def generate_password_for_entry(self, entry):
+        pwd = self.generate_secure_password(14)
+        entry.set_text(pwd)
+        entry.set_visibility(True)
+        self.copy_to_clipboard(pwd)
+        self.notify("Generated secure password & copied to clipboard!")
+
+    def copy_to_clipboard(self, text):
+        clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        clipboard.set_text(text, -1)
+        clipboard.store()
+        try:
+            subprocess.run(["wl-copy"], input=text, text=True, check=False)
+        except Exception:
+            pass
+        self.notify("Copied password to clipboard!")
+
+    def refresh_user_list(self):
+        self.change_user_combo.remove_all()
+        if hasattr(self, "del_user_combo"):
+            self.del_user_combo.remove_all()
+        users = []
+        try:
+            with open("/etc/passwd", "r") as f:
+                for line in f:
+                    parts = line.strip().split(":")
+                    if len(parts) >= 3:
+                        uname = parts[0]
+                        uid = int(parts[2])
+                        if uid == 0 or (uid >= 1000 and uid < 60000):
+                            users.append(uname)
+        except Exception:
+            users = ["krypton", "root"]
+
+        if not users:
+            users = ["krypton", "root"]
+
+        sorted_users = sorted(users)
+        for u in sorted_users:
+            self.change_user_combo.append_text(u)
+            if hasattr(self, "del_user_combo"):
+                self.del_user_combo.append_text(u)
+
+        default_idx = sorted_users.index("krypton") if "krypton" in sorted_users else 0
+        self.change_user_combo.set_active(default_idx)
+        if hasattr(self, "del_user_combo"):
+            self.del_user_combo.set_active(default_idx)
+
+    def verify_user_password(self, uname, entered_pwd):
+        if not entered_pwd:
+            return False, "⚠️ Please enter the user's current password first to verify!"
+        try:
+            res = subprocess.run(
+                ["sudo", "grep", f"^{uname}:", "/etc/shadow"],
+                capture_output=True,
+                text=True,
+            )
+            line = res.stdout.strip()
+            if not line:
+                return False, f"❌ User '{uname}' not found in /etc/shadow"
+            fields = line.split(":")
+            pw_hash = fields[1] if len(fields) > 1 else ""
+            if pw_hash == "":
+                return True, "No password set"
+            if pw_hash.startswith("!") or pw_hash.startswith("*"):
+                return False, f"❌ Account '{uname}' password is locked"
+
+            # Verify SHA-512 ($6$) or SHA-256 ($5$) or MD5 ($1$) via openssl passwd
+            if pw_hash.startswith("$6$") or pw_hash.startswith("$5$") or pw_hash.startswith("$1$"):
+                hp = pw_hash.split("$")
+                alg = hp[1]
+                salt_part = hp[2]
+                flag = f"-{alg}"
+                chk = subprocess.run(
+                    ["openssl", "passwd", flag, "-salt", salt_part, entered_pwd],
+                    capture_output=True,
+                    text=True,
+                )
+                if chk.stdout.strip() == pw_hash:
+                    return True, "Verified"
+
+            # Fallback verification via su pam authentication (run as unprivileged nobody so root doesn't bypass)
+            pam_chk = subprocess.run(
+                ["sudo", "-u", "nobody", "su", "-c", "true", uname],
+                input=entered_pwd + "\n",
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if pam_chk.returncode == 0:
+                return True, "Verified"
+
+            return False, f"❌ Incorrect password for '{uname}'! Enter their current password to delete."
+        except Exception as e:
+            return False, f"❌ Verification error: {e}"
+
+    def on_delete_password_clicked(self, _btn):
+        uname = self.del_user_combo.get_active_text()
+        entered_pwd = self.verify_pass_entry.get_text()
+
+        if not uname:
+            self.notify("⚠️ Please select a user first!")
+            return
+
+        ok, msg = self.verify_user_password(uname, entered_pwd)
+        if not ok:
+            self.notify(msg)
+            return
+
+        res = subprocess.run(
+            ["sudo", "passwd", "-d", uname],
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(["sudo", "sync"])
+        if res.returncode == 0:
+            self.verify_pass_entry.set_text("")
+            self.notify(f"✅ Password verified & deleted for '{uname}'! Account now has no password.")
+        else:
+            self.notify(f"❌ Failed to delete password for '{uname}'")
+
+    def on_delete_user_clicked(self, _btn):
+        uname = self.del_user_combo.get_active_text()
+        entered_pwd = self.verify_pass_entry.get_text()
+
+        if not uname:
+            self.notify("⚠️ Please select a user first!")
+            return
+
+        if uname == "root":
+            self.notify("⚠️ Cannot delete the root system account. Use 'Delete User Password' instead!")
+            return
+
+        ok, msg = self.verify_user_password(uname, entered_pwd)
+        if not ok:
+            self.notify(msg)
+            return
+
+        res = subprocess.run(
+            ["sudo", "userdel", "-r", "-f", uname],
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(["sudo", "sync"])
+        if res.returncode == 0:
+            self.verify_pass_entry.set_text("")
+            self.refresh_user_list()
+            self.notify(f"✅ Password verified & user account '{uname}' deleted!")
+        else:
+            self.notify(f"❌ Failed to delete user '{uname}'")
+
+    def on_create_user_clicked(self, _btn):
+        uname = self.new_user_entry.get_text().strip()
+        pwd = self.new_pass_entry.get_text()
+
+        if not uname:
+            self.notify("⚠️ Please enter a username first!")
+            return
+
+        if not re.match(r"^[a-z_][a-z0-9_-]*$", uname):
+            self.notify("⚠️ Invalid username. Use lowercase letters, digits, '_' or '-'")
+            return
+
+        if not pwd:
+            self.notify("⚠️ Please enter or generate a password!")
+            return
+
+        subprocess.run(
+            ["sudo", "useradd", "-m", "-k", "/etc/skel", "-s", "/bin/bash", "-G", "wheel,video,audio,input,storage", uname],
+            capture_output=True,
+        )
+        # Ensure password uses SHA-512 (-c SHA512) so openssl passwd -6 verification always works
+        res = subprocess.run(
+            ["sudo", "chpasswd", "-c", "SHA512"],
+            input=f"{uname}:{pwd}\n",
+            text=True,
+            capture_output=True,
+        )
+        subprocess.run(["sudo", "sh", "-c", f"echo '{uname} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/krypton-{uname} && chmod 0440 /etc/sudoers.d/krypton-{uname}"])
+        subprocess.run(["sudo", "sync"])
+        if res.returncode == 0:
+            self.new_user_entry.set_text("")
+            self.new_pass_entry.set_text("")
+            self.refresh_user_list()
+            self.notify(f"User '{uname}' created successfully with password!")
+        else:
+            self.notify(f"❌ Failed to create user '{uname}'")
+
+    def on_update_password_clicked(self, _btn):
+        uname = self.change_user_combo.get_active_text()
+        pwd = self.change_pass_entry.get_text()
+
+        if not uname:
+            self.notify("⚠️ Please select a user first!")
+            return
+
+        if not pwd:
+            self.notify("⚠️ Please enter or generate a new password!")
+            return
+
+        res = subprocess.run(
+            ["sudo", "chpasswd", "-c", "SHA512"],
+            input=f"{uname}:{pwd}\n",
+            text=True,
+            capture_output=True,
+        )
+        subprocess.run(["sudo", "sync"])
+        if res.returncode == 0:
+            self.change_pass_entry.set_text("")
+            self.notify(f"Password updated successfully for '{uname}'!")
+        else:
+            self.notify(f"❌ Failed to update password for '{uname}'")
+
+    def build_system_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        sec_persist = make_section(
+            "Permanent Disk Persistence",
+            "All files, wallpapers, settings, and packages save automatically to your 64GB NVMe drive.",
+        )
+        sync_btn = Gtk.Button(label="Flush to Disk Now")
+        sync_btn.get_style_context().add_class("primary-btn")
+        sync_btn.connect(
+            "clicked",
+            lambda _: (subprocess.run("sync", shell=True), self.notify("All data flushed to permanent NVMe disk!")),
+        )
+        sec_persist.pack_start(make_row("Storage Status", get_persistence_status(), sync_btn), False, False, 0)
+        page.pack_start(sec_persist, False, False, 0)
+
+        sec_tools = make_section("Apps, Browser & Hardware Control Panels", "Launch system utilities")
+        tools = [
+            ("File Explorer (Thunar GUI)", "Graphical file manager with tabs, archives & volume management (Super+E)", "thunar"),
+            ("Terminal File Explorer (Yazi)", "Blazing-fast terminal file manager with previews (Super+Shift+E)", "kitty -e yazi"),
+            ("Helium Browser (Default Browser)", "Launch privacy-focused Helium Browser (Super+B)", "helium-browser"),
+            ("Audio & Microphone Mixer", "Configure speakers, headphones, and input volume", "pavucontrol"),
+            ("Network & Wi-Fi Connections", "Manage Ethernet, Wi-Fi, and VPN profiles", "nm-connection-editor"),
+            ("Bluetooth Devices", "Pair headphones, controllers, and keyboards", "blueman-manager"),
+            ("GTK Theme & Icons (nwg-look)", "Customize GTK themes, cursors, and fonts", "nwg-look"),
+            ("Qt6 Theme Settings (qt6ct)", "Customize Qt application appearance", "qt6ct"),
+            ("Disk Management (GNOME Disks)", "View partitions and disk health", "gnome-disks"),
+            ("System Resource Monitor (btop)", "Live CPU, GPU, RAM, and process monitor", "kitty -e btop"),
+        ]
+        for title, subtitle, cmd in tools:
+            btn = Gtk.Button(label="Open")
+            btn.get_style_context().add_class("action-btn")
+            btn.connect("clicked", lambda _, c=cmd: subprocess.Popen(c, shell=True))
+            sec_tools.pack_start(make_row(title, subtitle, btn), False, False, 0)
+        page.pack_start(sec_tools, False, False, 0)
+
+        self.stack.add_titled(self.wrap_scrolled(page), "system", "Storage & Apps")
+
+    def set_hypr_keyword(self, key, val):
+        parts = key.split(":")
+        lua_val = val if val in ("true", "false") or val.lstrip("-").isdigit() else f'"{val}"'
+        expr = lua_val
+        for p in reversed(parts):
+            expr = "{ " + p + " = " + expr + " }"
+        run_cmd(f"hyprctl eval 'hl.config({expr})'")
+        self.notify(f"Applied {key} = {val}")
+
+    def on_apply_display(self, _btn):
+        res_idx = max(0, self.res_combo.get_active())
+        fps_idx = max(0, self.fps_combo.get_active())
+        scale_idx = max(0, self.scale_combo.get_active())
+
+        res = RESOLUTIONS[res_idx][1]
+        fps = REFRESH_RATES[fps_idx][1]
+        scale = SCALES[scale_idx][1]
+
+        self.apply_display_values(res, fps, scale)
+
+    def apply_display_values(self, res, fps, scale):
+        self.monitors = get_monitors()
+        mon_name = self.monitors[0].get("name", "Virtual-1")
+
+        if res == "preferred":
+            mode_str = "preferred"
+            wlr_cmd = f"wlr-randr --output {mon_name} --preferred --scale {scale}"
+        else:
+            mode_str = f"{res}@{fps}"
+            wlr_cmd = f"wlr-randr --output {mon_name} --custom-mode {res}@{fps}Hz --scale {scale}"
+
+        run_cmd(wlr_cmd)
+        run_cmd(f'hyprctl eval \'hl.monitor({{ output = "", mode = "{mode_str}", position = "auto", scale = "{scale}" }})\'')
+
+        lua_path = os.path.expanduser("~/.config/hypr/hyprland.lua")
+        if os.path.exists(lua_path):
+            try:
+                with open(lua_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                new_block = (
+                    f'hl.monitor({{\n'
+                    f'    output   = "",\n'
+                    f'    mode     = "{mode_str}",\n'
+                    f'    position = "auto",\n'
+                    f'    scale    = "{scale}",\n'
+                    f'}})'
+                )
+                content = re.sub(
+                    r'hl\.monitor\(\{[^}]+\}\)',
+                    new_block,
+                    content,
+                    count=1,
+                )
+                with open(lua_path, "w", encoding="utf-8") as f:
+                    f.write(content)
+                subprocess.run("sync", shell=True)
+            except Exception:
+                pass
+
+        self.notify(f"Saved {mode_str} (Scale {scale}x) permanently!")
+
+
+def main():
+    try:
+        settings = Gtk.Settings.get_default()
+        if settings:
+            settings.set_property("gtk-application-prefer-dark-theme", True)
+        provider = Gtk.CssProvider()
+        provider.load_from_data(CATPPUCCIN_CSS)
+        screen = Gdk.Screen.get_default()
+        if screen:
+            Gtk.StyleContext.add_provider_for_screen(
+                screen,
+                provider,
+                Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+            )
+        win = KryptonSettingsWindow()
+        win.connect("destroy", Gtk.main_quit)
+        win.show_all()
+        Gtk.main()
+    except Exception as e:
+        with open("/tmp/krypton-settings.log", "w") as f:
+            traceback.print_exc(file=f)
+        subprocess.run(["notify-send", "KryptonOS Settings Error", str(e)])
+
+
+if __name__ == "__main__":
+    main()

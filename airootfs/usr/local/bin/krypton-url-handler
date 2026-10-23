@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# KryptonOS Custom URL & Action Handler
+URL="$1"
+case "$URL" in
+    *krypton-action:minimize*|*krypton-action%3Aminimize*)
+        /usr/local/bin/krypton-win-ctl minimize
+        ;;
+    *krypton-action:fullscreen*|*krypton-action%3Afullscreen*|*krypton-action:maximize*|*krypton-action%3Amaximize*)
+        /usr/local/bin/krypton-win-ctl fullscreen
+        ;;
+    *krypton-action:close*|*krypton-action%3Aclose*|*krypton-action:exit*|*krypton-action%3Aexit*)
+        /usr/local/bin/krypton-win-ctl close
+        ;;
+    http://*|https://*|file://*)
+        helium-browser "$URL" &
+        ;;
+    *)
+        xdg-open "$URL" &
+        ;;
+esac

@@ -1,6 +1,6 @@
 # KryptonOS (Custom Linux Distribution)
 
-A lightweight, high-performance, aesthetics-first Linux distribution powered by **Hyprland**, GPU-accelerated **Kitty**, the blazing-fast Rust **Yazi** file manager, **Catppuccin Mocha** colors, and an out-of-the-box **Calamares** installer.
+A developer-focused Linux distribution powered by **Hyprland** with native dynamic tiling, GPU-accelerated **Kitty**, **VS Code**, **Neovim**, Git tools, and Python, Node.js, Go, and Rust toolchains.
 
 ---
 

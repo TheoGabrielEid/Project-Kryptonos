@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=KryptonOS Settings
+Comment=Configure Display Resolution, FPS / Refresh Rate, Scaling, Performance, and Hardware
+Exec=/usr/local/bin/krypton-settings
+Icon=preferences-system
+Terminal=false
+Type=Application
+Categories=Settings;System;DesktopSettings;
+Keywords=display;resolution;fps;refresh;hz;scale;hyprland;settings;krypton;

@@ -14,6 +14,9 @@ window#waybar {
 
 /* Individual Pill styling */
 #custom-launcher,
+#custom-files,
+#custom-browser,
+#custom-terminal,
 #workspaces,
 #window,
 #clock,
@@ -23,6 +26,7 @@ window#waybar {
 #memory,
 #battery,
 #tray,
+#custom-settings,
 #custom-power {
     background-color: rgba(30, 30, 46, 0.85);
     padding: 2px 14px;
@@ -32,9 +36,63 @@ window#waybar {
 }
 
 #custom-launcher {
-    font-size: 16px;
-    color: #89b4fa;
+    font-size: 14px;
+    font-weight: 900;
+    color: #11111b;
+    background: linear-gradient(45deg, #cba6f7, #89b4fa, #94e2d5);
+    padding: 2px 14px;
+    margin-right: 4px;
+}
+
+#custom-files {
+    color: #f9e2af;
+    margin-right: 4px;
+}
+
+#custom-browser {
+    color: #89dceb;
+    margin-right: 4px;
+}
+
+#custom-terminal {
+    color: #a6e3a1;
     margin-right: 6px;
+}
+
+#custom-win-min,
+#custom-win-max,
+#custom-win-close {
+    background-color: rgba(30, 30, 46, 0.90);
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-size: 14px;
+    border: 1px solid rgba(203, 166, 247, 0.25);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+#custom-win-min {
+    color: #f9e2af;
+    margin-left: 4px;
+}
+#custom-win-min:hover {
+    background-color: #f9e2af;
+    color: #11111b;
+}
+
+#custom-win-max {
+    color: #a6e3a1;
+}
+#custom-win-max:hover {
+    background-color: #a6e3a1;
+    color: #11111b;
+}
+
+#custom-win-close {
+    color: #f38ba8;
+}
+#custom-win-close:hover {
+    background-color: #f38ba8;
+    color: #11111b;
 }
 
 #workspaces button {
@@ -86,7 +144,12 @@ window#waybar {
     color: #f38ba8;
 }
 
+#custom-settings {
+    color: #cba6f7;
+    margin-left: 6px;
+}
+
 #custom-power {
     color: #f38ba8;
-    margin-left: 6px;
+    margin-left: 4px;
 }

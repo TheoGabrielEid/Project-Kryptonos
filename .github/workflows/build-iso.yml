@@ -3,7 +3,7 @@ name: Build Distro ISO
 on:
   workflow_dispatch:
   push:
-    branches: [ main, master ]
+    branches: [ main, master, codex/coding-optimized-iso ]
 
 jobs:
   build-and-release:

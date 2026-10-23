@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# KryptonOS Window Control Helper
+# Actions: close [addr] | toggle-float [addr] | fullscreen [addr]
+# ==============================================================================
+ACTION="${1:-close}"
+ARG="${2:-}"
+
+format_addr() {
+    local a="$1"
+    if [ -n "$a" ]; then
+        if [[ "$a" != address:* ]]; then
+            if [[ "$a" != 0x* ]]; then
+                a="0x$a"
+            fi
+            a="address:$a"
+        fi
+        echo "$a"
+    fi
+}
+
+case "$ACTION" in
+    close)
+        TARGET_ADDR=$(format_addr "${ARG:-}")
+        if [ -n "$TARGET_ADDR" ]; then
+            hyprctl dispatch closewindow "${TARGET_ADDR}"
+        else
+            hyprctl dispatch killactive
+        fi
+        ;;
+    fullscreen)
+        TARGET_ADDR=$(format_addr "${ARG:-}")
+        if [ -n "$TARGET_ADDR" ]; then
+            hyprctl dispatch focuswindow "${TARGET_ADDR}"
+        fi
+        hyprctl dispatch fullscreen 0
+        ;;
+    toggle-float)
+        TARGET_ADDR=$(format_addr "${ARG:-}")
+        if [ -n "$TARGET_ADDR" ]; then
+            hyprctl dispatch focuswindow "${TARGET_ADDR}"
+        fi
+        hyprctl dispatch togglefloating
+        ;;
+    *)
+        hyprctl dispatch killactive
+        ;;
+esac

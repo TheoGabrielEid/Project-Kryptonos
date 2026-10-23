@@ -154,6 +154,15 @@ libsecret
 neovim
 micro
 code
+python
+python-pip
+nodejs
+npm
+go
+rust
+cmake
+ninja
+gdb
 
 # Fonts & Visual Themes
 ttf-jetbrains-mono-nerd

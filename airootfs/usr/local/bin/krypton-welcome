@@ -1,4 +1,21 @@
 #!/usr/bin/env bash
-# KryptonOS Welcome & Installer Notification
+if [ ! -f /usr/share/backgrounds/krypton/cyber-neon.png ] && command -v magick >/dev/null 2>&1; then
+    sudo mkdir -p /usr/share/backgrounds/krypton 2>/dev/null || true
+    sudo magick -size 2560x1600 radial-gradient:'#cba6f7'-'#11111b' /usr/share/backgrounds/krypton/cyber-neon.png 2>/dev/null || true
+    sudo magick -size 2560x1600 radial-gradient:'#89b4fa'-'#11111b' /usr/share/backgrounds/krypton/deep-space.png 2>/dev/null || true
+    sudo magick -size 2560x1600 radial-gradient:'#a6e3a1'-'#11111b' /usr/share/backgrounds/krypton/emerald-grid.png 2>/dev/null || true
+fi
+mkdir -p "$HOME/Pictures/Wallpapers"
+ln -sf /usr/share/backgrounds/krypton/krypton-default.png "$HOME/Pictures/Wallpapers/KryptonOS-Crystal-Shield.png" 2>/dev/null || true
+ln -sf /usr/share/hypr/wall0.png "$HOME/Pictures/Wallpapers/Hyprland-Dawn.png" 2>/dev/null || true
+ln -sf /usr/share/hypr/wall1.png "$HOME/Pictures/Wallpapers/Hyprland-Night.png" 2>/dev/null || true
+ln -sf /usr/share/hypr/wall2.png "$HOME/Pictures/Wallpapers/Hyprland-Anime.png" 2>/dev/null || true
+
+xdg-settings set default-web-browser helium-browser.desktop 2>/dev/null || true
+xdg-mime default helium-browser.desktop x-scheme-handler/http 2>/dev/null || true
+xdg-mime default helium-browser.desktop x-scheme-handler/https 2>/dev/null || true
+xdg-mime default helium-browser.desktop text/html 2>/dev/null || true
+xdg-mime default thunar.desktop inode/directory 2>/dev/null || true
+
 sleep 2
-notify-send "Welcome to KryptonOS" "Press Super+Space for apps, Super+Return for Kitty, or click Install to start Calamares." --icon=archlinux -u normal
+notify-send "Welcome to KryptonOS" "Super+Return for Terminal, Super+Space for Launcher, Super+Q to close window." --icon=/usr/share/pixmaps/kryptonos.png -u normal

@@ -1,0 +1,608 @@
+#!/usr/bin/env python3
+"""
+KryptonOS Native Dock / Taskbar (GTK 3.0 + GtkLayerShell)
+Requirements:
+1. Start button: Official Krypton Crystal Shield icon only, no text.
+2. Authentic App Icons ONLY: Kitty, Helium, Thunar, VS Code, Settings.
+3. Hyprland Workspace Integration:
+   - Left click: Focuses the window (switches workspace automatically if needed) or launches it.
+   - Right click: Closes/Exits the window (`✕ Exit`), launches new instance, or manages pins.
+4. Clean, responsive, crash-proof.
+"""
+import glob
+import json
+import os
+import subprocess
+import sys
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
+gi.require_version("GtkLayerShell", "0.1")
+from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, GtkLayerShell
+
+PINS_FILE = os.path.expanduser("~/.config/krypton/dock_pins.json")
+
+DEFAULT_PINS = [
+    {"id": "terminal", "name": "Terminal", "icon_name": "kitty", "cmd": "kitty", "class_match": "kitty"},
+    {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code"},
+    {"id": "git", "name": "LazyGit", "icon_name": "git", "cmd": "kitty --class lazygit -e lazygit", "class_match": "lazygit"},
+    {"id": "browser", "name": "Helium Browser", "icon_name": "helium", "cmd": "helium-browser", "class_match": "helium|chromium|firefox"},
+    {"id": "files", "name": "Files", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar"},
+    {"id": "btop", "name": "System Monitor", "icon_name": "utilities-system-monitor", "cmd": "kitty --class btop -e btop", "class_match": "btop"},
+    {"id": "settings", "name": "Settings", "icon_name": "preferences-system", "cmd": "/usr/local/bin/krypton-settings", "class_match": "krypton-settings"},
+]
+
+APP_ICON_MAP = {
+    "kitty": ["kitty", "kitty-terminal", "utilities-terminal"],
+    "terminal": ["kitty", "utilities-terminal", "org.gnome.Terminal"],
+    "helium": ["/opt/helium-browser/product_logo_256.png", "/usr/share/pixmaps/helium.png", "helium", "chromium", "google-chrome", "web-browser"],
+    "helium-browser": ["/opt/helium-browser/product_logo_256.png", "/usr/share/pixmaps/helium.png", "helium", "chromium", "google-chrome", "web-browser"],
+    "chromium": ["chromium", "google-chrome", "web-browser"],
+    "firefox": ["firefox", "web-browser"],
+    "thunar": ["thunar", "org.xfce.thunar", "system-file-manager"],
+    "files": ["thunar", "org.xfce.thunar", "system-file-manager"],
+    "code": ["com.visualstudio.code", "visual-studio-code", "code-oss", "code"],
+    "vscode": ["com.visualstudio.code", "visual-studio-code", "code-oss", "code"],
+    "git": ["git", "vcs-git", "git-gui", "utilities-terminal"],
+    "lazygit": ["git", "vcs-git", "git-gui", "utilities-terminal"],
+    "settings": ["preferences-system", "org.gnome.Settings"],
+    "krypton-settings": ["preferences-system", "org.gnome.Settings"],
+    "calc": ["org.gnome.Calculator", "accessories-calculator"],
+    "calculator": ["org.gnome.Calculator", "accessories-calculator"],
+    "btop": ["utilities-system-monitor", "org.gnome.SystemMonitor", "system-monitor"],
+    "taskmanager": ["utilities-system-monitor", "org.gnome.SystemMonitor", "system-monitor"],
+    "audio": ["pavucontrol", "multimedia-volume-control", "audio-volume-high"],
+    "pavucontrol": ["pavucontrol", "multimedia-volume-control", "audio-volume-high"],
+    "disks": ["gnome-disks", "org.gnome.DiskUtility", "drive-harddisk"],
+}
+
+CATALOG_APPS = [
+    {"id": "terminal", "name": "Terminal", "icon_name": "kitty", "cmd": "kitty", "class_match": "kitty"},
+    {"id": "files", "name": "Files (Thunar)", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar"},
+    {"id": "browser", "name": "Helium Browser", "icon_name": "helium", "cmd": "helium-browser", "class_match": "helium|chromium"},
+    {"id": "firefox", "name": "Firefox", "icon_name": "firefox", "cmd": "firefox", "class_match": "firefox"},
+    {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code"},
+    {"id": "git", "name": "LazyGit", "icon_name": "git", "cmd": "kitty --class lazygit -e lazygit", "class_match": "lazygit"},
+    {"id": "calc", "name": "Calculator", "icon_name": "accessories-calculator", "cmd": "gnome-calculator", "class_match": "Calculator"},
+    {"id": "btop", "name": "Task Manager", "icon_name": "utilities-system-monitor", "cmd": "kitty -e btop", "class_match": "btop"},
+    {"id": "audio", "name": "Audio Mixer", "icon_name": "pavucontrol", "cmd": "pavucontrol", "class_match": "pavucontrol"},
+    {"id": "disks", "name": "Disk Utility", "icon_name": "gnome-disks", "cmd": "gnome-disks", "class_match": "Disks"},
+    {"id": "settings", "name": "Settings", "icon_name": "preferences-system", "cmd": "/usr/local/bin/krypton-settings", "class_match": "krypton-settings"},
+]
+
+DOCK_CSS = b"""
+window {
+    background-color: transparent;
+}
+.dock-container {
+    background-color: rgba(24, 24, 37, 0.94);
+    border: 2px solid rgba(203, 166, 247, 0.45);
+    border-radius: 22px;
+    padding: 6px 12px;
+    margin: 4px;
+}
+.dock-btn {
+    background-color: rgba(49, 50, 68, 0.65);
+    color: #cdd6f4;
+    border-radius: 14px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 5px;
+    border: 1px solid rgba(203, 166, 247, 0.15);
+}
+.dock-btn:hover {
+    background-color: rgba(203, 166, 247, 0.32);
+    border-color: #cba6f7;
+}
+.dock-btn-running {
+    background-color: rgba(137, 180, 250, 0.25);
+    border-bottom: 3px solid #cba6f7;
+}
+.dock-start-btn {
+    background: linear-gradient(135deg, #cba6f7, #89b4fa);
+    border-radius: 14px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 5px;
+    border: none;
+    box-shadow: 0 2px 10px rgba(203, 166, 247, 0.4);
+}
+.dock-start-btn:hover {
+    background: linear-gradient(135deg, #b4befe, #89dceb);
+}
+.sep-line {
+    background-color: rgba(203, 166, 247, 0.3);
+    min-width: 2px;
+    margin: 4px 6px;
+}
+menu {
+    background-color: #1e1e2e;
+    border: 1px solid rgba(203, 166, 247, 0.4);
+    border-radius: 12px;
+    padding: 6px;
+}
+menuitem {
+    color: #cdd6f4;
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+}
+menuitem:hover {
+    background-color: rgba(203, 166, 247, 0.25);
+    color: #ffffff;
+}
+"""
+
+
+class KryptonDock(Gtk.Window):
+    def __init__(self):
+        super().__init__()
+        self.set_title("krypton-dock")
+        self.set_decorated(False)
+        self.set_app_paintable(True)
+
+        GtkLayerShell.init_for_window(self)
+        GtkLayerShell.set_layer(self, GtkLayerShell.Layer.TOP)
+        GtkLayerShell.set_namespace(self, "krypton-dock")
+        GtkLayerShell.set_anchor(self, GtkLayerShell.Edge.BOTTOM, True)
+        GtkLayerShell.set_margin(self, GtkLayerShell.Edge.BOTTOM, 8)
+        GtkLayerShell.set_exclusive_zone(self, 58)
+
+        self.icon_theme = Gtk.IconTheme.get_default()
+        self.pins = self.load_pins()
+        self.clients = []
+        self._desktop_cache = {}
+        try:
+            self.build_desktop_cache()
+        except Exception:
+            pass
+
+        self.outer_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=6)
+        self.outer_box.get_style_context().add_class("dock-container")
+        self.add(self.outer_box)
+
+        self.rebuild_dock()
+        GLib.timeout_add(1500, self.poll_clients)
+
+    def build_desktop_cache(self):
+        search_dirs = [
+            "/usr/share/applications",
+            "/usr/local/share/applications",
+            os.path.expanduser("~/.local/share/applications"),
+        ]
+        for sdir in search_dirs:
+            if not os.path.exists(sdir):
+                continue
+            for dfile in glob.glob(os.path.join(sdir, "*.desktop")):
+                try:
+                    with open(dfile, "r", encoding="utf-8", errors="ignore") as f:
+                        name, icon, exec_cmd = "", "", ""
+                        for line in f:
+                            if line.startswith("Name=") and not name:
+                                name = line.split("=", 1)[1].strip()
+                            elif line.startswith("Icon=") and not icon:
+                                icon = line.split("=", 1)[1].strip()
+                            elif line.startswith("Exec=") and not exec_cmd:
+                                exec_cmd = line.split("=", 1)[1].strip()
+                        bname = os.path.splitext(os.path.basename(dfile))[0].lower()
+                        self._desktop_cache[bname] = {"name": name, "icon": icon, "cmd": exec_cmd}
+                except Exception:
+                    pass
+
+    def load_pins(self):
+        os.makedirs(os.path.dirname(PINS_FILE), exist_ok=True)
+        if os.path.exists(PINS_FILE):
+            try:
+                with open(PINS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, list) and data:
+                        cleaned = []
+                        for p in data:
+                            if isinstance(p, dict) and "cmd" in p:
+                                iname = p.get("icon_name") or p.get("id", "")
+                                if iname in ("kryptonos", "krypton", "kryptonos-logo"):
+                                    if p.get("id") == "browser":
+                                        p["icon_name"] = "helium"
+                                    else:
+                                        p["icon_name"] = p.get("id", "application-x-executable")
+                                else:
+                                    p["icon_name"] = iname or p.get("id", "application-x-executable")
+                                cleaned.append(p)
+                        if cleaned:
+                            return cleaned
+            except Exception:
+                pass
+        self.save_pins(DEFAULT_PINS)
+        return list(DEFAULT_PINS)
+
+    def save_pins(self, pins):
+        os.makedirs(os.path.dirname(PINS_FILE), exist_ok=True)
+        try:
+            with open(PINS_FILE, "w", encoding="utf-8") as f:
+                json.dump(pins, f, indent=2)
+        except Exception:
+            pass
+
+    def get_hypr_clients(self):
+        try:
+            res = subprocess.run(["hyprctl", "clients", "-j"], capture_output=True, text=True, timeout=1)
+            if res.returncode == 0 and res.stdout.strip():
+                return json.loads(res.stdout)
+        except Exception:
+            pass
+        return []
+
+    def poll_clients(self):
+        try:
+            new_clients = self.get_hypr_clients()
+            old_sigs = [(c.get("address"), c.get("class")) for c in self.clients]
+            new_sigs = [(c.get("address"), c.get("class")) for c in new_clients]
+            if old_sigs != new_sigs:
+                self.clients = new_clients
+                self.rebuild_dock()
+        except Exception:
+            pass
+        return True
+
+    def close_window(self, addr):
+        if not addr:
+            return
+        if not addr.startswith("0x") and not addr.startswith("address:"):
+            addr = f"0x{addr}"
+        subprocess.Popen(["hyprctl", "dispatch", "closewindow", f"address:{addr}"])
+        GLib.timeout_add(300, self.poll_clients)
+
+    def close_all_windows(self, windows):
+        for w in windows:
+            addr = w.get("address", "")
+            if addr:
+                if not addr.startswith("0x") and not addr.startswith("address:"):
+                    addr = f"0x{addr}"
+                subprocess.Popen(["hyprctl", "dispatch", "closewindow", f"address:{addr}"])
+        GLib.timeout_add(400, self.poll_clients)
+
+    def create_app_icon_widget(self, app_id_or_name, size=32):
+        try:
+            if app_id_or_name and os.path.exists(app_id_or_name):
+                try:
+                    pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(app_id_or_name, size, size, True)
+                    return Gtk.Image.new_from_pixbuf(pixbuf)
+                except Exception:
+                    pass
+
+            norm = (app_id_or_name or "").lower().strip()
+            candidates = []
+
+            if norm in APP_ICON_MAP:
+                candidates.extend(APP_ICON_MAP[norm])
+            
+            for k, v in APP_ICON_MAP.items():
+                if k in norm and norm not in candidates:
+                    candidates.extend(v)
+
+            candidates.append(norm)
+            candidates.append(norm.split(".")[-1])
+
+            for c in list(candidates):
+                if c in self._desktop_cache:
+                    d_icon = self._desktop_cache[c].get("icon")
+                    if d_icon and d_icon not in candidates:
+                        candidates.insert(0, d_icon)
+
+            for c in candidates:
+                if not c:
+                    continue
+                if os.path.exists(c):
+                    try:
+                        pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(c, size, size, True)
+                        return Gtk.Image.new_from_pixbuf(pixbuf)
+                    except Exception:
+                        pass
+
+                try:
+                    if self.icon_theme.has_icon(c):
+                        info = self.icon_theme.lookup_icon(c, size, Gtk.IconLookupFlags.FORCE_SIZE)
+                        if info:
+                            pixbuf = info.load_icon()
+                            if pixbuf:
+                                return Gtk.Image.new_from_pixbuf(pixbuf)
+                        return Gtk.Image.new_from_icon_name(c, Gtk.IconSize.LARGE_TOOLBAR)
+                except Exception:
+                    pass
+
+                patterns = [
+                    f"/usr/share/icons/*/*/*/{c}.png",
+                    f"/usr/share/icons/*/*/*/{c}.svg",
+                    f"/usr/share/pixmaps/{c}.png",
+                    f"/usr/share/pixmaps/{c}.svg",
+                    f"/usr/share/icons/hicolor/256x256/apps/{c}.png",
+                    f"/usr/share/icons/hicolor/scalable/apps/{c}.svg",
+                ]
+                for pat in patterns:
+                    matches = glob.glob(pat)
+                    if matches:
+                        try:
+                            pixbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(matches[0], size, size, True)
+                            return Gtk.Image.new_from_pixbuf(pixbuf)
+                        except Exception:
+                            pass
+
+            for fb in ["application-x-executable", "applications-other", "system-run"]:
+                if self.icon_theme.has_icon(fb):
+                    try:
+                        info = self.icon_theme.lookup_icon(fb, size, Gtk.IconLookupFlags.FORCE_SIZE)
+                        if info:
+                            pixbuf = info.load_icon()
+                            return Gtk.Image.new_from_pixbuf(pixbuf)
+                    except Exception:
+                        pass
+                    return Gtk.Image.new_from_icon_name(fb, Gtk.IconSize.LARGE_TOOLBAR)
+        except Exception as e:
+            print("Error resolving icon:", e)
+
+        return Gtk.Label(label="▪")
+
+    def rebuild_dock(self):
+        try:
+            for child in self.outer_box.get_children():
+                self.outer_box.remove(child)
+
+            # 1. Start Button: Krypton Crystal Shield icon
+            start_btn = Gtk.Button()
+            start_btn.set_tooltip_text("Applications (Super+Space)\nRight-click for System Menu")
+            start_btn.get_style_context().add_class("dock-start-btn")
+
+            k_logo_paths = [
+                "/usr/share/pixmaps/kryptonos.png",
+                "/usr/share/pixmaps/kryptonos-logo.png",
+                "/usr/share/icons/hicolor/512x512/apps/kryptonos.png",
+            ]
+            start_icon = None
+            for klp in k_logo_paths:
+                if os.path.exists(klp):
+                    try:
+                        pbuf = GdkPixbuf.Pixbuf.new_from_file_at_scale(klp, 30, 30, True)
+                        start_icon = Gtk.Image.new_from_pixbuf(pbuf)
+                        break
+                    except Exception:
+                        pass
+            if not start_icon:
+                start_icon = self.create_app_icon_widget("kryptonos", size=30)
+
+            start_btn.add(start_icon)
+            start_btn.connect("button-press-event", self.on_start_button_press)
+            self.outer_box.pack_start(start_btn, False, False, 0)
+
+            self.add_sep()
+
+            # 2. Pinned Apps
+            matched_addresses = set()
+            for pin in self.pins:
+                pmatch = pin.get("class_match", pin["id"]).lower()
+                matching_wins = []
+                for c in self.clients:
+                    wclass = (c.get("class") or "").lower()
+                    wtitle = (c.get("title") or "").lower()
+                    if any(m in wclass or m in wtitle for m in pmatch.split("|")):
+                        matching_wins.append(c)
+                        matched_addresses.add(c.get("address"))
+
+                matching_win = matching_wins[0] if matching_wins else None
+
+                btn = Gtk.Button()
+                icon_name = pin.get("icon_name") or pin.get("id")
+                icon_widget = self.create_app_icon_widget(icon_name, size=32)
+                btn.add(icon_widget)
+
+                status_text = f" ({len(matching_wins)} Open)" if len(matching_wins) > 1 else (" (Running)" if matching_win else "")
+                btn.set_tooltip_text(f"{pin['name']}{status_text}\nLeft-click: Focus / Open\nRight-click: Exit App / Launch New")
+                btn.get_style_context().add_class("dock-btn")
+                if matching_win:
+                    btn.get_style_context().add_class("dock-btn-running")
+
+                btn.connect("button-press-event", self.on_pin_button_press, pin, matching_wins)
+                self.outer_box.pack_start(btn, False, False, 0)
+
+            # 3. Unpinned Running Apps
+            unpinned = [c for c in self.clients if c.get("address") not in matched_addresses and c.get("class")]
+            if unpinned:
+                self.add_sep()
+                for c in unpinned:
+                    wclass = c.get("class", "App")
+                    title = c.get("title", wclass)
+                    short_name = wclass.split(".")[-1][:18].capitalize()
+
+                    btn = Gtk.Button()
+                    icon_widget = self.create_app_icon_widget(wclass, size=32)
+                    btn.add(icon_widget)
+
+                    btn.set_tooltip_text(f"{title} ({short_name})\nLeft-click: Focus\nRight-click: Exit / Pin to Taskbar")
+                    btn.get_style_context().add_class("dock-btn")
+                    btn.get_style_context().add_class("dock-btn-running")
+                    btn.connect("button-press-event", self.on_running_button_press, c)
+                    self.outer_box.pack_start(btn, False, False, 0)
+
+            self.outer_box.show_all()
+        except Exception as e:
+            print("Error in rebuild_dock:", e)
+
+    def add_sep(self):
+        sep = Gtk.Box()
+        sep.get_style_context().add_class("sep-line")
+        self.outer_box.pack_start(sep, False, False, 2)
+
+    def on_start_button_press(self, widget, event):
+        if event.button == 3:  # Right-click -> System Menu
+            menu = Gtk.Menu()
+
+            r_item = Gtk.MenuItem(label="🚀 Application Launcher")
+            r_item.connect("activate", lambda _: subprocess.Popen("rofi -show drun", shell=True))
+            menu.append(r_item)
+
+            t_item = Gtk.MenuItem(label="💻 Terminal (Kitty)")
+            t_item.connect("activate", lambda _: subprocess.Popen("kitty", shell=True))
+            menu.append(t_item)
+
+            f_item = Gtk.MenuItem(label="📁 File Explorer (Thunar)")
+            f_item.connect("activate", lambda _: subprocess.Popen("thunar", shell=True))
+            menu.append(f_item)
+
+            s_item = Gtk.MenuItem(label="⚙ Settings")
+            s_item.connect("activate", lambda _: subprocess.Popen("/usr/local/bin/krypton-settings", shell=True))
+            menu.append(s_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            pin_sub = Gtk.MenuItem(label="📌 Pin Apps to Taskbar...")
+            pin_menu = Gtk.Menu()
+            pinned_ids = {p["id"] for p in self.pins}
+            for app in CATALOG_APPS:
+                if app["id"] in pinned_ids:
+                    item = Gtk.MenuItem(label=f"✓ {app['name']} (Click to Unpin)")
+                    item.connect("activate", lambda _, aid=app["id"]: self.unpin_app(aid))
+                else:
+                    item = Gtk.MenuItem(label=f"➕ Pin {app['name']}")
+                    item.connect("activate", lambda _, a=app: self.pin_custom_app(a))
+                pin_menu.append(item)
+            pin_sub.set_submenu(pin_menu)
+            menu.append(pin_sub)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            p_item = Gtk.MenuItem(label="⏻ Power Off")
+            p_item.connect("activate", lambda _: subprocess.Popen("systemctl poweroff", shell=True))
+            menu.append(p_item)
+
+            reb_item = Gtk.MenuItem(label="🔄 Restart")
+            reb_item.connect("activate", lambda _: subprocess.Popen("systemctl reboot", shell=True))
+            menu.append(reb_item)
+
+            menu.show_all()
+            menu.popup_at_pointer(event)
+            return True
+
+        # Left click -> Open Rofi Launcher
+        subprocess.Popen("rofi -show drun", shell=True)
+        return True
+
+    def on_pin_button_press(self, widget, event, pin, matching_wins):
+        if event.button == 3:  # Right-click -> EXIT APP or Pin Options
+            menu = Gtk.Menu()
+
+            if matching_wins:
+                if len(matching_wins) == 1:
+                    w = matching_wins[0]
+                    addr = w.get("address", "")
+                    exit_item = Gtk.MenuItem(label=f"✕ Exit {pin['name']}")
+                    exit_item.connect("activate", lambda _, a=addr: self.close_window(a))
+                    menu.append(exit_item)
+                else:
+                    exit_all_item = Gtk.MenuItem(label=f"✕ Exit All {pin['name']} Windows ({len(matching_wins)})")
+                    exit_all_item.connect("activate", lambda _, ws=matching_wins: self.close_all_windows(ws))
+                    menu.append(exit_all_item)
+
+                    sub_close = Gtk.MenuItem(label="✕ Close Specific Window...")
+                    sub_menu = Gtk.Menu()
+                    for w in matching_wins:
+                        wtitle = w.get("title") or pin["name"]
+                        if len(wtitle) > 28:
+                            wtitle = wtitle[:25] + "..."
+                        waddr = w.get("address", "")
+                        w_item = Gtk.MenuItem(label=f"✕ {wtitle}")
+                        w_item.connect("activate", lambda _, a=waddr: self.close_window(a))
+                        sub_menu.append(w_item)
+                    sub_close.set_submenu(sub_menu)
+                    menu.append(sub_close)
+
+                menu.append(Gtk.SeparatorMenuItem())
+
+            launch_item = Gtk.MenuItem(label=f"🚀 Launch New {pin['name']}")
+            launch_item.connect("activate", lambda _: subprocess.Popen(pin["cmd"], shell=True))
+            menu.append(launch_item)
+
+            unpin_item = Gtk.MenuItem(label=f"❌ Unpin {pin['name']} from Taskbar")
+            unpin_item.connect("activate", lambda _: self.unpin_app(pin["id"]))
+            menu.append(unpin_item)
+
+            menu.show_all()
+            menu.popup_at_pointer(event)
+            return True
+
+        # Left click -> Focus window or launch
+        if matching_wins:
+            addr = matching_wins[0].get("address", "")
+            if addr:
+                subprocess.Popen(["hyprctl", "dispatch", "focuswindow", f"address:{addr}"])
+        else:
+            subprocess.Popen(pin["cmd"], shell=True)
+        return True
+
+    def on_running_button_press(self, widget, event, client):
+        addr = client.get("address", "")
+        wclass = client.get("class", "app")
+        short_name = wclass.split(".")[-1][:14].capitalize()
+
+        if event.button == 3:  # Right-click -> Close / Pin
+            menu = Gtk.Menu()
+
+            exit_item = Gtk.MenuItem(label=f"✕ Exit {short_name}")
+            exit_item.connect("activate", lambda _, a=addr: self.close_window(a))
+            menu.append(exit_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            pin_item = Gtk.MenuItem(label=f"📌 Pin '{short_name}' to Taskbar")
+            pin_item.connect(
+                "activate",
+                lambda _: self.pin_custom_app(
+                    {
+                        "id": wclass.lower(),
+                        "name": short_name,
+                        "icon_name": wclass.lower(),
+                        "cmd": wclass.lower(),
+                        "class_match": wclass.lower(),
+                    }
+                ),
+            )
+            menu.append(pin_item)
+
+            menu.show_all()
+            menu.popup_at_pointer(event)
+            return True
+
+        # Left click -> Focus
+        if addr:
+            subprocess.Popen(["hyprctl", "dispatch", "focuswindow", f"address:{addr}"])
+        return True
+
+    def pin_custom_app(self, app_dict):
+        for p in self.pins:
+            if p["id"] == app_dict["id"]:
+                return
+        self.pins.append(app_dict)
+        self.save_pins(self.pins)
+        self.rebuild_dock()
+
+    def unpin_app(self, app_id):
+        self.pins = [p for p in self.pins if p["id"] != app_id]
+        self.save_pins(self.pins)
+        self.rebuild_dock()
+
+
+def main():
+    provider = Gtk.CssProvider()
+    provider.load_from_data(DOCK_CSS)
+    screen = Gdk.Screen.get_default()
+    if screen:
+        Gtk.StyleContext.add_provider_for_screen(screen, provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+
+    win = KryptonDock()
+    win.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

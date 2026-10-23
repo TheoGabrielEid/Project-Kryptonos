@@ -1,5 +1,11 @@
 # KryptonOS .zshrc
 
+# Developer Environment Variables
+export EDITOR="nvim"
+export VISUAL="code --no-sandbox"
+export PAGER="less"
+export LANG="en_US.UTF-8"
+
 # History
 HISTFILE=~/.zsh_history
 HISTSIZE=50000
@@ -22,8 +28,37 @@ alias cat='bat --style=plain'
 alias grep='rg'
 alias find='fd'
 alias top='btop'
+alias v='nvim'
+alias vim='nvim'
+alias c='clear'
 alias y='yazi'
 alias lg='lazygit'
+
+# Git shortcuts
+alias g='git'
+alias gs='git status -sb'
+alias ga='git add'
+alias gaa='git add -A'
+alias gc='git commit -v'
+alias gcm='git commit -m'
+alias gco='git checkout'
+alias gcb='git checkout -b'
+alias gp='git push'
+alias gpf='git push --force-with-lease'
+alias gl='git pull --rebase'
+alias gd='git diff'
+alias gds='git diff --staged'
+alias glg='git log --graph --oneline --decorate --all'
+
+# Developer helpers
+alias py='python3'
+alias pip='python3 -m pip'
+alias venv='python3 -m venv .venv && source .venv/bin/activate'
+alias activate='source .venv/bin/activate'
+alias dc='docker compose'
+alias dcu='docker compose up -d'
+alias dcd='docker compose down'
+alias dcl='docker compose logs -f'
 alias update='sudo pacman -Syu'
 alias cleanup='sudo pacman -Rns $(pacman -Qtdq)'
 alias krypton-install='sudo archinstall'
