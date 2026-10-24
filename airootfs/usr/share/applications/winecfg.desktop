@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Wine Configuration
+GenericName=Windows Compatibility Configuration
+Comment=Configure Wine drives, graphics, audio and Windows versions
+Exec=winecfg
+Icon=wine-winecfg
+NoDisplay=false
+StartupNotify=true
+Categories=Settings;System;
+Keywords=wine;winecfg;windows;compatibility;drives;directx;

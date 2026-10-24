@@ -81,6 +81,8 @@ APP_ICON_MAP = {
     "audio": ["pavucontrol", "multimedia-volume-control", "audio-volume-high"],
     "pavucontrol": ["pavucontrol", "multimedia-volume-control", "audio-volume-high"],
     "disks": ["gnome-disks", "org.gnome.DiskUtility", "drive-harddisk"],
+    "wine": ["wine", "wine-winecfg", "preferences-system"],
+    "winecfg": ["wine-winecfg", "wine", "preferences-system"],
 }
 
 CATALOG_APPS = [
@@ -94,6 +96,7 @@ CATALOG_APPS = [
     {"id": "btop", "name": "Task Manager", "icon_name": "utilities-system-monitor", "cmd": "kitty -e btop", "class_match": "btop"},
     {"id": "audio", "name": "Audio Mixer", "icon_name": "pavucontrol", "cmd": "pavucontrol", "class_match": "pavucontrol"},
     {"id": "disks", "name": "Disk Utility", "icon_name": "gnome-disks", "cmd": "gnome-disks", "class_match": "Disks"},
+    {"id": "winecfg", "name": "Windows App Support (Wine)", "icon_name": "wine", "cmd": "/usr/local/bin/krypton-exe-runner config", "class_match": "winecfg.exe|wine"},
     {"id": "themes", "name": "Theme Studio", "icon_name": "preferences-desktop-theme", "cmd": "/usr/local/bin/krypton-themes", "class_match": "krypton-themes"},
     {"id": "settings", "name": "Settings", "icon_name": "preferences-system", "cmd": "/usr/local/bin/krypton-settings", "class_match": "krypton-settings"},
 ]

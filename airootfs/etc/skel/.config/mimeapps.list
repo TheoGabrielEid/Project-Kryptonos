@@ -1,0 +1,18 @@
+[Default Applications]
+application/x-msdos-program=krypton-exe-runner.desktop;wine.desktop;
+application/x-msdownload=krypton-exe-runner.desktop;wine.desktop;
+application/x-msi=krypton-exe-runner.desktop;wine.desktop;
+application/x-dosexec=krypton-exe-runner.desktop;wine.desktop;
+application/x-wine-extension-msp=krypton-exe-runner.desktop;wine.desktop;
+inode/directory=thunar.desktop;krypton-files.desktop;
+text/plain=visual-studio-code.desktop;code.desktop;
+text/markdown=visual-studio-code.desktop;code.desktop;
+x-scheme-handler/http=helium-browser.desktop;firefox.desktop;
+x-scheme-handler/https=helium-browser.desktop;firefox.desktop;
+
+[Added Associations]
+application/x-msdos-program=krypton-exe-runner.desktop;wine.desktop;
+application/x-msdownload=krypton-exe-runner.desktop;wine.desktop;
+application/x-msi=krypton-exe-runner.desktop;wine.desktop;
+application/x-dosexec=krypton-exe-runner.desktop;wine.desktop;
+application/x-wine-extension-msp=krypton-exe-runner.desktop;wine.desktop;

@@ -192,3 +192,9 @@ docker-compose
 arch-install-scripts
 archinstall
 sudo
+
+# Windows Application Compatibility (.exe / .msi)
+wine
+winetricks
+wine-gecko
+wine-mono
