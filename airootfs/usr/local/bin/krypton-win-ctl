@@ -2,13 +2,29 @@
 # ==============================================================================
 # KryptonOS Universal Window Controls & Mode Manager
 # Actions:
-#   close [addr] | maximize [addr] | minimize [addr] | restore
-#   toggle-float [addr] | get-mode | set-mode <windows|hyprland> | status
+#   close [addr] | maximize [addr] | minimize [addr] | restore [addr]
+#   toggle-float [addr] | get-mode | set-mode <windows|hyprland> | toggle-mode | status
 # ==============================================================================
 ACTION="${1:-status}"
 ARG="${2:-}"
-MODE_FILE="$HOME/.config/hypr/.window_mode"
-MODE_CONF="$HOME/.config/hypr/window_mode.conf"
+USER_HOME="${HOME:-/home/krypton}"
+MODE_FILE="$USER_HOME/.config/hypr/.window_mode"
+MODE_CONF="$USER_HOME/.config/hypr/window_mode.conf"
+
+# Auto-discover HYPRLAND_INSTANCE_SIGNATURE & XDG_RUNTIME_DIR if missing
+if [ -z "${HYPRLAND_INSTANCE_SIGNATURE:-}" ]; then
+    UID_NUM=$(id -u)
+    for rt in "${XDG_RUNTIME_DIR:-}" "/run/user/${UID_NUM}" "/run/user/1000"; do
+        [ -z "$rt" ] && continue
+        for d in "$rt/hypr"/* "/tmp/hypr"/*; do
+            if [ -S "${d}/.socket.sock" ] || [ -S "${d}/.socket2.sock" ]; then
+                export HYPRLAND_INSTANCE_SIGNATURE=$(basename "$d")
+                export XDG_RUNTIME_DIR="$rt"
+                break 2
+            fi
+        done
+    done
+fi
 
 format_addr() {
     local a="$1"
@@ -33,17 +49,23 @@ get_current_mode() {
 
 set_window_mode() {
     local target="$1"
-    mkdir -p "$HOME/.config/hypr"
+    if [ "$target" != "windows" ]; then
+        target="hyprland"
+    fi
+
+    mkdir -p "$USER_HOME/.config/hypr"
+    echo "$target" > "$MODE_FILE"
+
+    # Also persist to /etc/skel so all future sessions inherit it
+    mkdir -p /etc/skel/.config/hypr 2>/dev/null || true
+    echo "$target" > /etc/skel/.config/hypr/.window_mode 2>/dev/null || true
 
     if [ "$target" = "windows" ]; then
-        echo "windows" > "$MODE_FILE"
         cat << 'EOF' > "$MODE_CONF"
 # ==============================================================================
-# KryptonOS Window Mode Configuration
-# Mode: Windows Style (Floating & Resizable)
+# KryptonOS Window Mode: Windows Style (Floating & Resizable)
 # ==============================================================================
 windowrule = match:class .*, float true
-windowrule = match:class .*, center true
 
 general {
     layout = dwindle
@@ -52,8 +74,17 @@ general {
     hover_icon_on_border = true
 }
 EOF
+        cp -f "$MODE_CONF" /etc/skel/.config/hypr/window_mode.conf 2>/dev/null || true
+
         # Reload Hyprland to apply configuration
         hyprctl reload >/dev/null 2>&1 || true
+
+        # Ensure window mode daemon is running
+        if ! pgrep -f krypton-window-mode-daemon >/dev/null 2>&1; then
+            (nohup python3 /usr/local/bin/krypton-window-mode-daemon >/dev/null 2>&1 &)
+        else
+            pkill -USR1 -f krypton-window-mode-daemon 2>/dev/null || true
+        fi
 
         # Float all currently open windows
         if command -v jq >/dev/null 2>&1; then
@@ -62,13 +93,11 @@ EOF
             done
         fi
 
-        notify-send "Window Mode: Windows Style" "Floating windows active. Drag titlebars or borders to move and resize." --icon=preferences-system -u normal
+        notify-send "Window Mode: Windows Style" "Floating windows active. Drag titlebars or borders to move and resize." --icon=preferences-system -u normal 2>/dev/null || true
     else
-        echo "hyprland" > "$MODE_FILE"
         cat << 'EOF' > "$MODE_CONF"
 # ==============================================================================
-# KryptonOS Window Mode Configuration
-# Mode: Hyprland Tiling (Automatic Grid)
+# KryptonOS Window Mode: Hyprland Tiling (Automatic Grid)
 # ==============================================================================
 general {
     layout = dwindle
@@ -83,8 +112,17 @@ dwindle {
     smart_resizing = true
 }
 EOF
+        cp -f "$MODE_CONF" /etc/skel/.config/hypr/window_mode.conf 2>/dev/null || true
+
         # Reload Hyprland to apply configuration
         hyprctl reload >/dev/null 2>&1 || true
+
+        # Ensure window mode daemon is running
+        if ! pgrep -f krypton-window-mode-daemon >/dev/null 2>&1; then
+            (nohup python3 /usr/local/bin/krypton-window-mode-daemon >/dev/null 2>&1 &)
+        else
+            pkill -USR1 -f krypton-window-mode-daemon 2>/dev/null || true
+        fi
 
         # Tile all open regular app windows
         if command -v jq >/dev/null 2>&1; then
@@ -93,8 +131,11 @@ EOF
             done
         fi
 
-        notify-send "Window Mode: Hyprland Tiling" "Dynamic auto-tiling grid active with zero wasted screen space." --icon=preferences-system -u normal
+        notify-send "Window Mode: Hyprland Tiling" "Dynamic auto-tiling grid active with zero wasted screen space." --icon=preferences-system -u normal 2>/dev/null || true
     fi
+
+    # Trigger dock to refresh mode button
+    pkill -USR1 -f krypton-dock 2>/dev/null || true
     sync 2>/dev/null || true
 }
 
@@ -131,14 +172,19 @@ case "$ACTION" in
         fi
         hyprctl dispatch togglefloating
         ;;
-    get-mode)
+    get-mode|status)
         get_current_mode
         ;;
     set-mode)
         set_window_mode "${ARG:-hyprland}"
         ;;
-    status)
-        get_current_mode
+    toggle-mode)
+        CUR=$(get_current_mode)
+        if [ "$CUR" = "windows" ]; then
+            set_window_mode "hyprland"
+        else
+            set_window_mode "windows"
+        fi
         ;;
     *)
         hyprctl dispatch killactive

@@ -12,6 +12,7 @@ Requirements:
 import glob
 import json
 import os
+import signal
 import subprocess
 import sys
 
@@ -22,6 +23,25 @@ gi.require_version("Gdk", "3.0")
 gi.require_version("GdkPixbuf", "2.0")
 gi.require_version("GtkLayerShell", "0.1")
 from gi.repository import Gdk, GdkPixbuf, GLib, Gtk, GtkLayerShell
+
+def ensure_hypr_env():
+    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        uid = getattr(os, "getuid", lambda: 1000)()
+        candidates = [
+            os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}"),
+            f"/run/user/{uid}",
+            "/run/user/1000",
+        ]
+        for rt in candidates:
+            if not rt or not os.path.exists(rt):
+                continue
+            matches = glob.glob(f"{rt}/hypr/*/.socket.sock") + glob.glob("/tmp/hypr/*/.socket.sock")
+            if matches:
+                matches.sort(key=os.path.getmtime, reverse=True)
+                sig = os.path.basename(os.path.dirname(matches[0]))
+                os.environ["HYPRLAND_INSTANCE_SIGNATURE"] = sig
+                os.environ["XDG_RUNTIME_DIR"] = rt
+                break
 
 PINS_FILE = os.path.expanduser("~/.config/krypton/dock_pins.json")
 
@@ -116,6 +136,22 @@ window {
 .dock-start-btn:hover {
     background: linear-gradient(135deg, #b4befe, #89dceb);
 }
+.dock-mode-btn {
+    background-color: rgba(49, 50, 68, 0.75);
+    color: #cba6f7;
+    font-family: "JetBrainsMono Nerd Font", monospace;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 14px;
+    padding: 2px 12px;
+    min-height: 44px;
+    border: 1px solid rgba(203, 166, 247, 0.35);
+}
+.dock-mode-btn:hover {
+    background-color: rgba(203, 166, 247, 0.35);
+    color: #ffffff;
+    border: 1px solid rgba(203, 166, 247, 0.7);
+}
 .sep-line {
     background-color: rgba(203, 166, 247, 0.3);
     min-width: 2px;
@@ -167,8 +203,37 @@ class KryptonDock(Gtk.Window):
         self.outer_box.get_style_context().add_class("dock-container")
         self.add(self.outer_box)
 
+        self.last_mode = self.get_current_mode()
+        self.setup_signals()
+
         self.rebuild_dock()
         GLib.timeout_add(1500, self.poll_clients)
+
+    def setup_signals(self):
+        try:
+            GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGUSR1, self.on_sigusr1)
+        except Exception:
+            pass
+
+    def on_sigusr1(self):
+        self.poll_clients()
+        return True
+
+    def get_current_mode(self):
+        mode_file = os.path.expanduser("~/.config/hypr/.window_mode")
+        if os.path.exists(mode_file):
+            try:
+                with open(mode_file, "r", encoding="utf-8") as f:
+                    m = f.read().strip()
+                    if m in ("windows", "hyprland"):
+                        return m
+            except Exception:
+                pass
+        return "hyprland"
+
+    def on_toggle_mode(self, _btn):
+        subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "toggle-mode"])
+        GLib.timeout_add(250, self.poll_clients)
 
     def build_desktop_cache(self):
         search_dirs = [
@@ -240,11 +305,14 @@ class KryptonDock(Gtk.Window):
 
     def poll_clients(self):
         try:
+            ensure_hypr_env()
             new_clients = self.get_hypr_clients()
             old_sigs = [(c.get("address"), c.get("class")) for c in self.clients]
             new_sigs = [(c.get("address"), c.get("class")) for c in new_clients]
-            if old_sigs != new_sigs:
+            cur_mode = self.get_current_mode()
+            if old_sigs != new_sigs or cur_mode != getattr(self, "last_mode", None):
                 self.clients = new_clients
+                self.last_mode = cur_mode
                 self.rebuild_dock()
         except Exception:
             pass
@@ -427,6 +495,16 @@ class KryptonDock(Gtk.Window):
                     btn.get_style_context().add_class("dock-btn-running")
                     btn.connect("button-press-event", self.on_running_button_press, c)
                     self.outer_box.pack_start(btn, False, False, 0)
+
+            # 4. Quick Window Mode Switcher Button
+            self.add_sep()
+            cur_mode = self.get_current_mode()
+            mode_lbl = "🪟 Windows" if cur_mode == "windows" else "⚡ Tiling"
+            mode_btn = Gtk.Button(label=mode_lbl)
+            mode_btn.set_tooltip_text(f"Window Mode: {cur_mode.capitalize()}\nClick to switch instantly between Windows Floating and Hyprland Tiling")
+            mode_btn.get_style_context().add_class("dock-mode-btn")
+            mode_btn.connect("clicked", self.on_toggle_mode)
+            self.outer_box.pack_start(mode_btn, False, False, 0)
 
             self.outer_box.show_all()
         except Exception as e:

@@ -1,6 +1,173 @@
 #!/usr/bin/env python3
 """
-KryptonOS Window Mode Daemon (Disabled - Using Native Hyprland Tiling)
+KryptonOS Dynamic Window Mode Daemon:
+Maintains Windows-style floating windows or Hyprland auto-tiling dynamically.
+Listens on Hyprland's socket2 for openwindow events and enforces the active mode.
 """
+import glob
+import json
+import os
+import signal
+import socket
+import subprocess
 import sys
-sys.exit(0)
+import threading
+import time
+
+MODE_FILE = os.path.expanduser("~/.config/hypr/.window_mode")
+
+ALWAYS_FLOAT_CLASSES = {
+    "pavucontrol",
+    "blueman-manager",
+    "nm-connection-editor",
+    "org.gnome.Calculator",
+    "file-roller",
+    "krypton-settings",
+    "krypton-themes",
+    "KryptonSettings",
+    "org.kryptonos.Settings",
+    "scratchpad",
+    "kproj",
+    "lazygit",
+}
+
+
+def get_mode():
+    try:
+        if os.path.exists(MODE_FILE):
+            with open(MODE_FILE, "r", encoding="utf-8") as f:
+                m = f.read().strip()
+                if m in ("windows", "hyprland"):
+                    return m
+    except Exception:
+        pass
+    return "hyprland"
+
+
+def ensure_hypr_env():
+    uid = getattr(os, "getuid", lambda: 1000)()
+    candidates = [
+        os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}"),
+        f"/run/user/{uid}",
+        "/run/user/1000",
+    ]
+    for rt in candidates:
+        if not rt or not os.path.exists(rt):
+            continue
+        matches = glob.glob(f"{rt}/hypr/*/.socket2.sock") + glob.glob("/tmp/hypr/*/.socket2.sock")
+        if matches:
+            matches.sort(key=os.path.getmtime, reverse=True)
+            for sp in matches:
+                try:
+                    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                    s.connect(sp)
+                    s.close()
+                    sig_name = os.path.basename(os.path.dirname(sp))
+                    os.environ["HYPRLAND_INSTANCE_SIGNATURE"] = sig_name
+                    os.environ["XDG_RUNTIME_DIR"] = rt
+                    return sp
+                except Exception:
+                    continue
+    return None
+
+
+def hctl_dispatch(*args):
+    try:
+        subprocess.run(
+            ["hyprctl", "dispatch", *args],
+            env=os.environ,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=2,
+        )
+    except Exception:
+        pass
+
+
+def enforce_all_windows():
+    mode = get_mode()
+    try:
+        res = subprocess.run(
+            ["hyprctl", "clients", "-j"],
+            capture_output=True,
+            text=True,
+            env=os.environ,
+            timeout=2,
+        )
+        if res.returncode == 0 and res.stdout.strip():
+            clients = json.loads(res.stdout)
+            for c in clients:
+                addr = c.get("address")
+                wclass = c.get("class", "")
+                if not addr:
+                    continue
+                if not addr.startswith("0x"):
+                    addr = f"0x{addr}"
+                if mode == "windows":
+                    hctl_dispatch("setfloating", f"address:{addr}")
+                elif mode == "hyprland" and wclass not in ALWAYS_FLOAT_CLASSES:
+                    hctl_dispatch("settiled", f"address:{addr}")
+    except Exception:
+        pass
+
+
+def enforce_window(addr, wclass=""):
+    if not addr:
+        return
+    if not addr.startswith("0x"):
+        addr = f"0x{addr}"
+    mode = get_mode()
+    if mode == "windows":
+        hctl_dispatch("setfloating", f"address:{addr}")
+        time.sleep(0.04)
+        hctl_dispatch("setfloating", f"address:{addr}")
+    elif mode == "hyprland" and wclass not in ALWAYS_FLOAT_CLASSES:
+        hctl_dispatch("settiled", f"address:{addr}")
+
+
+def handle_open(addr, wclass=""):
+    threading.Thread(target=enforce_window, args=(addr, wclass), daemon=True).start()
+
+
+def on_sigusr1(signum, frame):
+    threading.Thread(target=enforce_all_windows, daemon=True).start()
+
+
+def main():
+    signal.signal(signal.SIGUSR1, on_sigusr1)
+
+    while True:
+        sock_path = ensure_hypr_env()
+        if not sock_path:
+            time.sleep(1)
+            continue
+
+        try:
+            s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            s.connect(sock_path)
+            buf = ""
+            while True:
+                data = s.recv(4096)
+                if not data:
+                    break
+                buf += data.decode("utf-8", errors="ignore")
+                while "\n" in buf:
+                    line, buf = buf.split("\n", 1)
+                    line = line.strip()
+                    if not line:
+                        continue
+
+                    if line.startswith("openwindow>>") or line.startswith("openwindowv2>>"):
+                        prefix = "openwindowv2>>" if line.startswith("openwindowv2>>") else "openwindow>>"
+                        parts = line[len(prefix):].split(",")
+                        if parts:
+                            addr = parts[0].strip()
+                            wclass = parts[2].strip() if len(parts) > 2 else ""
+                            handle_open(addr, wclass)
+
+        except Exception:
+            time.sleep(1)
+
+
+if __name__ == "__main__":
+    main()
