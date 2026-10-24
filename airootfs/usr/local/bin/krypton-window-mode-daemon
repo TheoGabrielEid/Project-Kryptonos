@@ -121,6 +121,9 @@ def enforce_window(addr, wclass=""):
         hctl_dispatch("setfloating", f"address:{addr}")
         time.sleep(0.04)
         hctl_dispatch("setfloating", f"address:{addr}")
+        if wclass in ("kitty", "terminal"):
+            hctl_dispatch("resizewindowpixel", "exact 880 540", f"address:{addr}")
+            hctl_dispatch("centerwindow", f"address:{addr}")
     elif mode == "hyprland" and wclass not in ALWAYS_FLOAT_CLASSES:
         hctl_dispatch("settiled", f"address:{addr}")
 
