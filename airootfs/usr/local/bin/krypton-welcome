@@ -18,4 +18,4 @@ xdg-mime default helium-browser.desktop text/html 2>/dev/null || true
 xdg-mime default thunar.desktop inode/directory 2>/dev/null || true
 
 sleep 2
-notify-send "Welcome to KryptonOS" "Super+Return for Terminal, Super+Space for Launcher, Super+Q to close window." --icon=/usr/share/pixmaps/kryptonos.png -u normal
+notify-send "Welcome to KryptonOS Developer Edition" "Coding Workspace Ready: Super+C (VS Code), Super+N (Neovim), Super+\` (Scratchpad), Super+G (Git)." --icon=/usr/share/pixmaps/kryptonos.png -u normal

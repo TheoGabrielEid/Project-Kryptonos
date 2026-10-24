@@ -29,11 +29,18 @@ alias v='nvim'
 alias vim='nvim'
 alias c='clear'
 
-# Quick Language Aliases
+# Quick Language & Runtime Aliases
 alias py="python3"
 alias pip="pip3"
 alias d="docker"
 alias dco="docker-compose"
+alias dps="docker ps --format 'table {{.ID}}\t{{.Names}}\t{{.Status}}\t{{.Ports}}'"
+alias dstop='docker stop $(docker ps -q) 2>/dev/null || true'
+alias dclean="docker system prune -f"
+alias serve="python3 -m http.server 8000"
+alias ports="ss -tulpn"
+alias hr="hyprctl reload"
+alias kproj="krypton-project"
 
 # Git Productivity Shortcuts
 alias g='git'

@@ -290,28 +290,107 @@ class KryptonSettingsWindow(Gtk.Window):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
 
         intro = make_section(
-            "Coding Workspace",
-            "Hyprland remains the desktop compositor. Applications open as floating windows so your editor, terminal, browser, and documentation can overlap and keep independent sizes.",
+            "Coding Workspace & Developer Environment",
+            "KryptonOS is pre-tuned for high-performance development with native compilers, container runtimes, and fast terminal tooling.",
         )
         page.pack_start(intro, False, False, 0)
 
-        tools = make_section(
-            "Developer Tools",
-            "Launch the coding tools from the dock or use these shortcuts.",
+        # 1. Quick Launch Actions
+        actions_sec = make_section(
+            "Developer Launchpad",
+            "Launch your core IDEs, project scaffolders, and terminal tools instantly.",
+        )
+        dev_tools = [
+            ("New Project Scaffolder", "Generate Rust, Python, Go, TypeScript, C/C++, or Web projects", "Scaffold", lambda: subprocess.Popen(["kitty", "--class", "kproj", "-e", "krypton-project"])),
+            ("Neovim Lua IDE", "Launch pre-configured Neovim with Catppuccin theme and Netrw tree", "Launch", lambda: subprocess.Popen(["kitty", "--class", "nvim", "-e", "nvim"])),
+            ("Visual Studio Code", "Open VS Code with JetBrains Mono ligatures & dark theme", "Launch", lambda: subprocess.Popen(["code", "--no-sandbox"])),
+            ("Scratchpad Terminal", "Toggle dropdown floating terminal (or press Super + ` / F12)", "Toggle", lambda: subprocess.Popen(["hyprctl", "dispatch", "togglespecialworkspace", "scratchpad"])),
+            ("LazyGit Interface", "Interactive terminal git staging, commit, and branching GUI", "Launch", lambda: subprocess.Popen(["kitty", "--class", "lazygit", "-e", "lazygit"])),
+        ]
+        for title, subtitle, btn_label, callback in dev_tools:
+            btn = Gtk.Button(label=btn_label)
+            btn.get_style_context().add_class("primary-btn" if "Scaffold" in btn_label else "action-btn")
+            btn.connect("clicked", lambda _, cb=callback: cb())
+            actions_sec.pack_start(make_row(title, subtitle, btn), False, False, 0)
+        page.pack_start(actions_sec, False, False, 0)
+
+        # 2. Git Identity Configuration
+        git_sec = make_section(
+            "Git Identity Configuration",
+            "Set your global commit author name and email permanently across all repositories.",
+        )
+        cur_git_name = run_cmd("git config --global user.name") or ""
+        cur_git_email = run_cmd("git config --global user.email") or ""
+
+        self.git_name_entry = Gtk.Entry()
+        self.git_name_entry.set_placeholder_text("e.g. Linus Torvalds")
+        self.git_name_entry.set_text(cur_git_name)
+        self.git_name_entry.set_width_chars(25)
+        git_sec.pack_start(make_row("Author Name", "Display name used for git commits", self.git_name_entry), False, False, 0)
+
+        self.git_email_entry = Gtk.Entry()
+        self.git_email_entry.set_placeholder_text("e.g. developer@example.com")
+        self.git_email_entry.set_text(cur_git_email)
+        self.git_email_entry.set_width_chars(25)
+        git_sec.pack_start(make_row("Author Email", "Email address associated with git commits", self.git_email_entry), False, False, 0)
+
+        save_git_btn = Gtk.Button(label="Save Git Identity")
+        save_git_btn.get_style_context().add_class("primary-btn")
+        save_git_btn.connect("clicked", self.on_save_git_identity)
+        git_sec.pack_start(make_row("Apply Git Configuration", "Saves to ~/.gitconfig", save_git_btn), False, False, 0)
+        page.pack_start(git_sec, False, False, 0)
+
+        # 3. Installed Compilers & Runtimes
+        toolchain_sec = make_section(
+            "Detected Compilers & Toolchains",
+            "System status of installed language runtimes and build tools.",
+        )
+        toolchains = [
+            ("Python 3", "python3 --version"),
+            ("Rust / Cargo", "rustc --version"),
+            ("Go (Golang)", "go version"),
+            ("Node.js (JavaScript / TypeScript)", "node --version"),
+            ("GCC C/C++ Compiler", "gcc --version"),
+            ("Git VCS", "git --version"),
+            ("Docker Engine", "docker --version"),
+        ]
+        for name, cmd in toolchains:
+            ver = run_cmd(cmd)
+            if ver:
+                ver_line = ver.splitlines()[0]
+                if len(ver_line) > 35:
+                    ver_line = ver_line[:32] + "..."
+                badge = Gtk.Label(label=f" {ver_line} ")
+                badge.get_style_context().add_class("status-banner")
+            else:
+                badge = Gtk.Label(label=" Not Installed ")
+            toolchain_sec.pack_start(make_row(name, f"Command: {cmd.split()[0]}", badge), False, False, 0)
+        page.pack_start(toolchain_sec, False, False, 0)
+
+        # 4. Keyboard Shortcuts Reference
+        shortcuts_sec = make_section(
+            "Developer Shortcuts Reference",
+            "Key combinations optimized for split tiling and fast developer navigation.",
         )
         shortcuts = [
-            ("Code editor", "Open Visual Studio Code", "Super + C"),
-            ("Terminal", "Open Kitty for shells, builds, and debugging", "Super + Return"),
-            ("Git client", "Open LazyGit in Kitty", "Super + G"),
-            ("System monitor", "Inspect CPU and memory usage", "Super + T"),
-            ("File manager", "Browse project files", "Super + E"),
-            ("Application search", "Find installed developer tools", "Super + Space"),
+            ("Visual Studio Code", "Open VS Code editor", "Super + C"),
+            ("Neovim Lua IDE", "Open terminal-based Neovim", "Super + N"),
+            ("Scratchpad Terminal", "Dropdown Quake-style terminal", "Super + `  /  F12"),
+            ("Project Scaffolder", "Create new Rust, Go, Python, Node, C project", "Super + Shift + P"),
+            ("Kitty Terminal", "Launch main GPU-accelerated terminal", "Super + Return"),
+            ("LazyGit TUI", "Git staging, branching & committing", "Super + G"),
+            ("Yazi File Manager", "Fast terminal file browser with previews", "Super + Y"),
+            ("Btop System Monitor", "CPU, memory, disk, and process stats", "Super + T"),
+            ("Toggle Dwindle Split", "Change split direction between horizontal & vertical", "Super + D"),
+            ("Toggle Floating Mode", "Switch between tiling and floating window", "Super + W"),
+            ("Wayland Clipboard", "Fuzzy search and paste clipboard history", "Super + V"),
+            ("Application Finder", "Search and launch any system program", "Super + Space"),
         ]
         for title, subtitle, badge_text in shortcuts:
             badge = Gtk.Label(label=f" {badge_text} ")
             badge.get_style_context().add_class("status-banner")
-            tools.pack_start(make_row(title, subtitle, badge), False, False, 0)
-        page.pack_start(tools, False, False, 0)
+            shortcuts_sec.pack_start(make_row(title, subtitle, badge), False, False, 0)
+        page.pack_start(shortcuts_sec, False, False, 0)
 
         self.stack.add_titled(self.wrap_scrolled(page), "coding_workspace", "Coding Workspace")
     def build_display_page(self):
@@ -930,6 +1009,15 @@ class KryptonSettingsWindow(Gtk.Window):
             expr = "{ " + p + " = " + expr + " }"
         run_cmd(f"hyprctl eval 'hl.config({expr})'")
         self.notify(f"Applied {key} = {val}")
+
+    def on_save_git_identity(self, _btn):
+        name = self.git_name_entry.get_text().strip()
+        email = self.git_email_entry.get_text().strip()
+        if name:
+            subprocess.run(["git", "config", "--global", "user.name", name], check=False)
+        if email:
+            subprocess.run(["git", "config", "--global", "user.email", email], check=False)
+        self.notify("Saved Git identity to ~/.gitconfig!")
 
     def on_apply_display(self, _btn):
         res_idx = max(0, self.res_combo.get_active())

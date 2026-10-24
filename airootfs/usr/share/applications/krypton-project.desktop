@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=New Project Scaffolder
+GenericName=Project Scaffolder
+Comment=Instantly scaffold Rust, Python, Go, TypeScript, C/C++, and Web projects
+Exec=kitty --class kproj -e krypton-project
+Icon=code
+Terminal=false
+Type=Application
+Categories=Development;IDE;
+Keywords=project;scaffold;code;rust;python;go;typescript;node;
+StartupNotify=true

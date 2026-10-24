@@ -1,0 +1,448 @@
+#!/usr/bin/env python3
+"""
+KryptonOS Project Scaffolding CLI (krypton-project / kproj)
+Instantly scaffolds modern, production-ready coding workspaces for:
+Rust, Python, Go, Node/TypeScript, C/C++, and Web.
+Automatically configures git, .gitignore, README, and opens your editor.
+"""
+import os
+import sys
+import subprocess
+import shutil
+
+# Catppuccin Mocha ANSI Colors
+C_MAUVE   = "\033[38;2;203;166;247m"
+C_BLUE    = "\033[38;2;137;180;250m"
+C_GREEN   = "\033[38;2;166;227;161m"
+C_PEACH   = "\033[38;2;250;179;135m"
+C_YELLOW  = "\033[38;2;249;226;175m"
+C_RED     = "\033[38;2;243;139;168m"
+C_SUBTEXT = "\033[38;2;166;173;200m"
+C_BOLD    = "\033[1m"
+C_RESET   = "\033[0m"
+
+
+TEMPLATES = {
+    "1": ("python", "Python 3 Project (Virtualenv & pyproject.toml ready)"),
+    "2": ("rust", "Rust Binary Project (Cargo workspace)"),
+    "3": ("go", "Go Project (go.mod + main package)"),
+    "4": ("typescript", "Node.js / TypeScript Project (ESM + tsconfig)"),
+    "5": ("c", "C / C++ Project (CMakeLists + Makefile)"),
+    "6": ("web", "Modern Web Project (HTML5 + Catppuccin CSS + JS)"),
+}
+
+
+def banner():
+    print(f"""
+{C_MAUVE}{C_BOLD}  ╔═══════════════════════════════════════════════════╗
+  ║    ⚡ KryptonOS Developer Project Scaffolder     ║
+  ╚═══════════════════════════════════════════════════╝{C_RESET}
+""")
+
+
+def scaffold_python(path, name):
+    os.makedirs(os.path.join(path, "src"), exist_ok=True)
+    with open(os.path.join(path, "src", "__init__.py"), "w") as f:
+        pass
+    with open(os.path.join(path, "main.py"), "w") as f:
+        f.write(f'''#!/usr/bin/env python3
+"""
+{name} - KryptonOS Python Project
+"""
+import sys
+
+def main():
+    print("🚀 Hello from {name} on KryptonOS!")
+
+if __name__ == "__main__":
+    main()
+''')
+    with open(os.path.join(path, "pyproject.toml"), "w") as f:
+        f.write(f'''[project]
+name = "{name}"
+version = "0.1.0"
+description = "A modern Python project built on KryptonOS"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+''')
+    with open(os.path.join(path, "requirements.txt"), "w") as f:
+        f.write("# Project dependencies\n")
+    with open(os.path.join(path, ".gitignore"), "w") as f:
+        f.write('''__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.env
+.venv
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+''')
+
+
+def scaffold_rust(path, name):
+    if shutil.which("cargo"):
+        subprocess.run(["cargo", "init", "--bin", path], check=False, stdout=subprocess.DEVNULL)
+    else:
+        os.makedirs(os.path.join(path, "src"), exist_ok=True)
+        with open(os.path.join(path, "Cargo.toml"), "w") as f:
+            f.write(f'''[package]
+name = "{name}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+''')
+        with open(os.path.join(path, "src", "main.rs"), "w") as f:
+            f.write(f'''fn main() {{
+    println!("🚀 Hello from {name} on KryptonOS!");
+}}
+''')
+        with open(os.path.join(path, ".gitignore"), "w") as f:
+            f.write('''/target
+**/*.rs.bk
+Cargo.lock
+''')
+
+
+def scaffold_go(path, name):
+    if shutil.which("go"):
+        subprocess.run(["go", "mod", "init", name], cwd=path, check=False, stdout=subprocess.DEVNULL)
+    else:
+        with open(os.path.join(path, "go.mod"), "w") as f:
+            f.write(f'''module {name}
+
+go 1.22
+''')
+    with open(os.path.join(path, "main.go"), "w") as f:
+        f.write(f'''package main
+
+import "fmt"
+
+func main() {{
+\tfmt.Println("🚀 Hello from {name} on KryptonOS!")
+}}
+''')
+    with open(os.path.join(path, ".gitignore"), "w") as f:
+        f.write(f'''# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+{name}
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+vendor/
+''')
+
+
+def scaffold_typescript(path, name):
+    os.makedirs(os.path.join(path, "src"), exist_ok=True)
+    with open(os.path.join(path, "package.json"), "w") as f:
+        f.write(f'''{{
+  "name": "{name}",
+  "version": "1.0.0",
+  "description": "TypeScript workspace on KryptonOS",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {{
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  }},
+  "keywords": [],
+  "author": "",
+  "license": "MIT"
+}}
+''')
+    with open(os.path.join(path, "tsconfig.json"), "w") as f:
+        f.write('''{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*"]
+}
+''')
+    with open(os.path.join(path, "src", "index.ts"), "w") as f:
+        f.write(f'''console.log("🚀 Hello from {name} (TypeScript) on KryptonOS!");
+''')
+    with open(os.path.join(path, ".gitignore"), "w") as f:
+        f.write('''node_modules/
+dist/
+*.log
+.env
+''')
+
+
+def scaffold_c(path, name):
+    os.makedirs(os.path.join(path, "src"), exist_ok=True)
+    with open(os.path.join(path, "src", "main.c"), "w") as f:
+        f.write(f'''#include <stdio.h>
+
+int main(void) {{
+    printf("🚀 Hello from {name} (C) on KryptonOS!\\n");
+    return 0;
+}}
+''')
+    with open(os.path.join(path, "CMakeLists.txt"), "w") as f:
+        f.write(f'''cmake_minimum_required(VERSION 3.15)
+project({name} C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+
+add_executable({name} src/main.c)
+''')
+    with open(os.path.join(path, "Makefile"), "w") as f:
+        f.write(f'''CC ?= gcc
+CFLAGS ?= -Wall -Wextra -O2
+TARGET = {name}
+
+all: $(TARGET)
+
+$(TARGET): src/main.c
+\t$(CC) $(CFLAGS) -o $(TARGET) src/main.c
+
+clean:
+\trm -f $(TARGET)
+''')
+    with open(os.path.join(path, ".gitignore"), "w") as f:
+        f.write(f'''build/
+*.o
+*.a
+*.so
+{name}
+.cache/
+compile_commands.json
+''')
+
+
+def scaffold_web(path, name):
+    with open(os.path.join(path, "index.html"), "w") as f:
+        f.write(f'''<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{name}</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="card">
+        <h1>🚀 {name}</h1>
+        <p>Built with KryptonOS Modern Web Workspace.</p>
+        <button id="actionBtn">Click Me</button>
+        <div id="output"></div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
+''')
+    with open(os.path.join(path, "style.css"), "w") as f:
+        f.write('''body {
+    background-color: #1e1e2e;
+    color: #cdd6f4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+}
+.card {
+    background: #181825;
+    border: 1px solid #313244;
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+h1 { color: #cba6f7; margin-top: 0; }
+p { color: #a6adc8; }
+button {
+    background: #89b4fa;
+    color: #11111b;
+    border: none;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 15px;
+    transition: transform 0.1s ease;
+}
+button:hover { background: #b4befe; transform: scale(1.04); }
+#output { margin-top: 16px; color: #a6e3a1; font-weight: bold; }
+''')
+    with open(os.path.join(path, "app.js"), "w") as f:
+        f.write('''document.getElementById("actionBtn").addEventListener("click", () => {
+    document.getElementById("output").textContent = "⚡ KryptonOS Web Application Active!";
+});
+''')
+    with open(os.path.join(path, ".gitignore"), "w") as f:
+        f.write('''.DS_Store
+Thumbs.db
+''')
+
+
+def main():
+    banner()
+
+    # Parse arguments
+    template = None
+    name = None
+    editor_choice = "code"
+
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    flags = [a for a in sys.argv[1:] if a.startswith("--")]
+
+    if "--nvim" in flags:
+        editor_choice = "nvim"
+    elif "--code" in flags:
+        editor_choice = "code"
+
+    if len(args) >= 2:
+        template = args[0].lower()
+        name = args[1]
+    elif len(args) == 1:
+        name = args[0]
+
+    # Interactive prompt if template not supplied
+    if not template:
+        print(f"{C_BOLD}Select a project template:{C_RESET}\n")
+        for key, (t_name, desc) in TEMPLATES.items():
+            print(f"  {C_MAUVE}[{key}]{C_RESET} {C_BOLD}{t_name.upper():<12}{C_RESET} {C_SUBTEXT}{desc}{C_RESET}")
+        print()
+        
+        try:
+            choice = input(f"{C_YELLOW}Enter choice [1-6] (default 1): {C_RESET}").strip() or "1"
+        except (KeyboardInterrupt, EOFError):
+            print("\nAborted.")
+            sys.exit(0)
+
+        template = TEMPLATES.get(choice, ("python", ""))[0]
+
+    if not name:
+        try:
+            name = input(f"{C_YELLOW}Enter project name (default 'my-{template}'): {C_RESET}").strip() or f"my-{template}"
+        except (KeyboardInterrupt, EOFError):
+            print("\nAborted.")
+            sys.exit(0)
+
+    # Clean name
+    name = "".join(c if (c.isalnum() or c in "-_") else "-" for c in name)
+    target_dir = os.path.abspath(name)
+
+    if os.path.exists(target_dir) and os.listdir(target_dir):
+        print(f"{C_RED}Error: Directory '{name}' already exists and is not empty!{C_RESET}")
+        sys.exit(1)
+
+    os.makedirs(target_dir, exist_ok=True)
+    print(f"\n{C_BLUE}:: Scaffolding {template.upper()} project in {target_dir}...{C_RESET}")
+
+    # Scaffold
+    if template in ["python", "py"]:
+        scaffold_python(target_dir, name)
+    elif template in ["rust", "rs"]:
+        scaffold_rust(target_dir, name)
+    elif template in ["go", "golang"]:
+        scaffold_go(target_dir, name)
+    elif template in ["typescript", "ts", "node", "js", "javascript"]:
+        scaffold_typescript(target_dir, name)
+    elif template in ["c", "cpp", "c++"]:
+        scaffold_c(target_dir, name)
+    elif template in ["web", "html"]:
+        scaffold_web(target_dir, name)
+    else:
+        scaffold_python(target_dir, name)
+
+    # General README.md if not already created
+    readme_path = os.path.join(target_dir, "README.md")
+    if not os.path.exists(readme_path):
+        with open(readme_path, "w") as f:
+            f.write(f'''# {name}
+
+A modern {template.capitalize()} workspace scaffolded on **KryptonOS**.
+
+## Quick Start
+
+- Open in VS Code: `code .`
+- Open in Neovim: `nvim .`
+''')
+
+    # Initialize Git repository
+    try:
+        subprocess.run(["git", "init", "-b", "main"], cwd=target_dir, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "add", "-A"], cwd=target_dir, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["git", "commit", "-m", f"Initial commit ({template} scaffold)"], cwd=target_dir, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f"{C_GREEN}✓ Initialized Git repository (main branch){C_RESET}")
+    except Exception:
+        pass
+
+    print(f"{C_GREEN}{C_BOLD}✓ Project '{name}' successfully created!{C_RESET}\n")
+
+    # Ask to open editor if interactive
+    if not any(f in flags for f in ["--code", "--nvim", "--no-editor"]):
+        print(f"Choose editor to launch:")
+        print(f"  {C_MAUVE}[1]{C_RESET} Visual Studio Code")
+        print(f"  {C_MAUVE}[2]{C_RESET} Neovim IDE")
+        print(f"  {C_MAUVE}[3]{C_RESET} Terminal only (stay in shell)")
+        try:
+            ed_choice = input(f"{C_YELLOW}Choice [1/2/3] (default 1): {C_RESET}").strip() or "1"
+            if ed_choice == "2":
+                editor_choice = "nvim"
+            elif ed_choice == "3":
+                editor_choice = "none"
+            else:
+                editor_choice = "code"
+        except (KeyboardInterrupt, EOFError):
+            editor_choice = "none"
+
+    if editor_choice == "code":
+        print(f"{C_BLUE}:: Launching VS Code in {name}...{C_RESET}")
+        subprocess.Popen(["code", "--no-sandbox", target_dir])
+    elif editor_choice == "nvim":
+        print(f"{C_BLUE}:: Launching Neovim in {name}...{C_RESET}")
+        subprocess.call(["nvim", target_dir])
+    else:
+        print(f"{C_SUBTEXT}Done. To work on your project: cd {name}{C_RESET}")
+
+
+if __name__ == "__main__":
+    main()
