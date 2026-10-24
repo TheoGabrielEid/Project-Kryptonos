@@ -609,6 +609,29 @@ class ThemeManagerWindow(Gtk.Window):
         header.pack_end(max_btn)
         header.pack_end(min_btn)
 
+        # Allow dragging the window when windowed from the titlebar like in Windows
+        header.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        def on_header_press(widget, event):
+            if event.button == 1:
+                if event.type == Gdk.EventType._2BUTTON_PRESS:
+                    subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
+                    return True
+                elif event.type == Gdk.EventType.BUTTON_PRESS:
+                    try:
+                        out = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=0.5).stdout
+                        data = json.loads(out)
+                        if data.get("fullscreen", 0) != 0:
+                            subprocess.run(["hyprctl", "dispatch", "fullscreen", "1"])
+                            subprocess.run(["hyprctl", "dispatch", "setfloating"])
+                        elif not data.get("floating", False):
+                            subprocess.run(["hyprctl", "dispatch", "setfloating"])
+                    except Exception:
+                        pass
+                    self.begin_move_drag(event.button, int(event.x_root), int(event.y_root), event.time)
+                    return True
+            return False
+        header.connect("button-press-event", on_header_press)
+
         self.set_titlebar(header)
 
     def setup_ui(self):

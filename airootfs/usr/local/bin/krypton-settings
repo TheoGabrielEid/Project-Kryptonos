@@ -263,14 +263,14 @@ class KryptonSettingsWindow(Gtk.Window):
         self.monitors = get_monitors()
         self.active_monitor = self.monitors[0].get("name", "Virtual-1")
 
-        # HeaderBar + StackSwitcher (Native System Minimize, Maximize/Fullscreen, and Close buttons)
+        # HeaderBar (Native System Navigation Bar: Minimize, Maximize/Windowed, and Close buttons)
         header = Gtk.HeaderBar()
         header.set_show_close_button(False)
+        header.props.title = "KryptonOS Settings"
+        header.props.subtitle = "System Preferences & Workspace Controls"
+
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
-        switcher = Gtk.StackSwitcher()
-        switcher.set_stack(self.stack)
-        header.set_custom_title(switcher)
 
         min_btn = Gtk.Button(label="🗕")
         min_btn.set_tooltip_text("Minimize Window")
@@ -291,10 +291,40 @@ class KryptonSettingsWindow(Gtk.Window):
         header.pack_end(close_btn)
         header.pack_end(max_btn)
         header.pack_end(min_btn)
+
+        # Allow dragging the window when windowed from the titlebar like in Windows
+        header.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+        def on_header_press(widget, event):
+            if event.button == 1:
+                if event.type == Gdk.EventType._2BUTTON_PRESS:
+                    subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
+                    return True
+                elif event.type == Gdk.EventType.BUTTON_PRESS:
+                    try:
+                        out = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=0.5).stdout
+                        data = json.loads(out)
+                        if data.get("fullscreen", 0) != 0:
+                            subprocess.run(["hyprctl", "dispatch", "fullscreen", "1"])
+                            subprocess.run(["hyprctl", "dispatch", "setfloating"])
+                        elif not data.get("floating", False):
+                            subprocess.run(["hyprctl", "dispatch", "setfloating"])
+                    except Exception:
+                        pass
+                    self.begin_move_drag(event.button, int(event.x_root), int(event.y_root), event.time)
+                    return True
+            return False
+        header.connect("button-press-event", on_header_press)
         self.set_titlebar(header)
 
         main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         self.add(main_vbox)
+
+        switcher = Gtk.StackSwitcher()
+        switcher.set_stack(self.stack)
+        switcher.set_halign(Gtk.Align.CENTER)
+        switcher.set_margin_top(8)
+        switcher.set_margin_bottom(4)
+        main_vbox.pack_start(switcher, False, False, 0)
 
         self.status_label = Gtk.Label(
             label="💎 KryptonOS Control Center — Changes apply live & save permanently to disk",

@@ -9,10 +9,7 @@
     "modules-left": [
         "custom/launcher",
         "hyprland/workspaces",
-        "hyprland/window",
-        "custom/win_min",
-        "custom/win_max",
-        "custom/win_close"
+        "hyprland/window"
     ],
     "modules-center": [
         "clock"
