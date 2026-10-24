@@ -154,20 +154,13 @@ case "$ACTION" in
             hyprctl dispatch focuswindow "${TARGET_ADDR}"
         fi
 
-        # Get active window state to cleanly toggle between Maximized and Windowed
+        # Cleanly toggle between Fullscreen / Maximized and Windowed
         WIN_JSON=$(hyprctl activewindow -j 2>/dev/null)
         IS_FS=$(echo "$WIN_JSON" | jq -r '.fullscreen // 0' 2>/dev/null || echo 0)
-        IS_FLOAT=$(echo "$WIN_JSON" | jq -r '.floating // false' 2>/dev/null || echo false)
 
-        if [ "$IS_FS" != "0" ] && [ "$IS_FS" != "false" ]; then
-            # Currently maximized/fullscreen: restore back to windowed floating
-            hyprctl dispatch fullscreen 1
-            hyprctl dispatch setfloating
-        elif [ "$IS_FLOAT" = "false" ]; then
-            # Currently tiled: make it a floating windowed box
-            hyprctl dispatch togglefloating
+        if [ "$IS_FS" = "2" ]; then
+            hyprctl dispatch fullscreen 0
         else
-            # Currently floating: maximize
             hyprctl dispatch fullscreen 1
         fi
         ;;

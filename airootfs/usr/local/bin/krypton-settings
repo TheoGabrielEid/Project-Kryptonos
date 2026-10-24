@@ -141,6 +141,27 @@ button.action-btn {
 button.action-btn:hover {
     background-color: #45475a;
 }
+button.win-btn {
+    background-image: none;
+    background-color: transparent;
+    border: none;
+    border-radius: 6px;
+    padding: 3px 9px;
+    color: #cdd6f4;
+    font-size: 13px;
+    font-weight: bold;
+    min-height: 26px;
+    min-width: 26px;
+    margin-left: 2px;
+}
+button.win-btn:hover {
+    background-color: #45475a;
+    color: #ffffff;
+}
+button.win-close-btn:hover {
+    background-color: #f38ba8;
+    color: #11111b;
+}
 .mode-card {
     background-color: #181825;
     border: 2px solid #313244;
@@ -244,12 +265,32 @@ class KryptonSettingsWindow(Gtk.Window):
 
         # HeaderBar + StackSwitcher (Native System Minimize, Maximize/Fullscreen, and Close buttons)
         header = Gtk.HeaderBar()
-        header.set_show_close_button(True)
+        header.set_show_close_button(False)
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         switcher = Gtk.StackSwitcher()
         switcher.set_stack(self.stack)
         header.set_custom_title(switcher)
+
+        min_btn = Gtk.Button(label="🗕")
+        min_btn.set_tooltip_text("Minimize Window")
+        min_btn.get_style_context().add_class("win-btn")
+        min_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"]))
+
+        max_btn = Gtk.Button(label="🗖")
+        max_btn.set_tooltip_text("Maximize / Windowed")
+        max_btn.get_style_context().add_class("win-btn")
+        max_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"]))
+
+        close_btn = Gtk.Button(label="✕")
+        close_btn.set_tooltip_text("Close / Exit")
+        close_btn.get_style_context().add_class("win-btn")
+        close_btn.get_style_context().add_class("win-close-btn")
+        close_btn.connect("clicked", lambda _: self.close())
+
+        header.pack_end(close_btn)
+        header.pack_end(max_btn)
+        header.pack_end(min_btn)
         self.set_titlebar(header)
 
         main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
