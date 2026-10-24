@@ -17,6 +17,9 @@ import time
 MODE_FILE = os.path.expanduser("~/.config/hypr/.window_mode")
 
 ALWAYS_FLOAT_CLASSES = {
+    "kitty",
+    "nvim",
+    "btop",
     "pavucontrol",
     "blueman-manager",
     "nm-connection-editor",

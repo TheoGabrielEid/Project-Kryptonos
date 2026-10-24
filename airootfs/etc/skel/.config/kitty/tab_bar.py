@@ -26,6 +26,7 @@ def _ensure_patch():
         def _krypton_activate_tab_at(self, *args, **kwargs):
             try:
                 x = float(args[0]) if args else 0.0
+                is_double = bool(args[1]) if len(args) > 1 else False
                 cw = _last_cell_w
                 if hasattr(self, "tab_bar") and getattr(self.tab_bar, "cell_width", 0):
                     cw = float(self.tab_bar.cell_width)
@@ -34,6 +35,11 @@ def _ensure_patch():
                     cols = int(self.tab_bar.screen.columns)
 
                 col = int(x / max(1.0, cw))
+
+                # Double click anywhere on empty bar toggles maximize / windowed
+                if is_double and col < cols - 14:
+                    subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
+                    return
 
                 # Navigation buttons occupy the last 14 columns
                 # [🗕] cols-14 to cols-10 | [🗖] cols-9 to cols-5 | [✕] cols-4 to cols

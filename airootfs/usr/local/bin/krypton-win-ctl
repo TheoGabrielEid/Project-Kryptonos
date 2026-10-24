@@ -124,9 +124,9 @@ EOF
             pkill -USR1 -f krypton-window-mode-daemon 2>/dev/null || true
         fi
 
-        # Tile all open regular app windows
+        # Tile all open regular app windows (keep terminal and utilities windowed)
         if command -v jq >/dev/null 2>&1; then
-            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "pavucontrol" and .class != "blueman-manager" and .class != "org.gnome.Calculator" and .class != "krypton-settings" and .class != "krypton-themes" and .class != "file-roller" and .class != "scratchpad" and .class != "kproj") | .address // empty'); do
+            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "kitty" and .class != "nvim" and .class != "btop" and .class != "pavucontrol" and .class != "blueman-manager" and .class != "org.gnome.Calculator" and .class != "krypton-settings" and .class != "krypton-themes" and .class != "file-roller" and .class != "scratchpad" and .class != "kproj") | .address // empty'); do
                 hyprctl dispatch settiled "address:${addr}" >/dev/null 2>&1 || true
             done
         fi
@@ -153,7 +153,23 @@ case "$ACTION" in
         if [ -n "$TARGET_ADDR" ]; then
             hyprctl dispatch focuswindow "${TARGET_ADDR}"
         fi
-        hyprctl dispatch fullscreen 1
+
+        # Get active window state to cleanly toggle between Maximized and Windowed
+        WIN_JSON=$(hyprctl activewindow -j 2>/dev/null)
+        IS_FS=$(echo "$WIN_JSON" | jq -r '.fullscreen // 0' 2>/dev/null || echo 0)
+        IS_FLOAT=$(echo "$WIN_JSON" | jq -r '.floating // false' 2>/dev/null || echo false)
+
+        if [ "$IS_FS" != "0" ] && [ "$IS_FS" != "false" ]; then
+            # Currently maximized/fullscreen: restore back to windowed floating
+            hyprctl dispatch fullscreen 1
+            hyprctl dispatch setfloating
+        elif [ "$IS_FLOAT" = "false" ]; then
+            # Currently tiled: make it a floating windowed box
+            hyprctl dispatch togglefloating
+        else
+            # Currently floating: maximize
+            hyprctl dispatch fullscreen 1
+        fi
         ;;
     minimize)
         TARGET_ADDR=$(format_addr "${ARG:-}")
