@@ -19,6 +19,16 @@ headerbar:backdrop,
     color: #a6adc8;
 }
 
+/* Smooth UI Animations & Hover Transitions */
+button,
+entry,
+headerbar button.titlebutton,
+.titlebar button.titlebutton,
+.sidebar-row,
+list row {
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Ensure navigation buttons are ALWAYS visible regardless of tiled/floating state */
 headerbar button.titlebutton,
 headerbar windowhandle box.right button,

@@ -83,6 +83,7 @@ headerbar {
     color: #cdd6f4;
     font-size: 13px;
     font-weight: 500;
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .sidebar-row:hover {
     background-color: rgba(203, 166, 247, 0.18);
@@ -99,6 +100,7 @@ headerbar {
 .file-item {
     border-radius: 8px;
     padding: 6px;
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .file-item:selected {
     background-color: rgba(203, 166, 247, 0.35);
@@ -117,6 +119,7 @@ button.nav-btn {
     border-radius: 8px;
     padding: 4px 8px;
     border: 1px solid rgba(203, 166, 247, 0.15);
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 button.nav-btn:hover {
     background-color: rgba(203, 166, 247, 0.3);
@@ -132,6 +135,7 @@ button.win-btn {
     border: none;
     font-weight: bold;
     font-size: 14px;
+    transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
 }
 button.win-btn:hover {
     background-color: rgba(69, 71, 90, 0.6);
