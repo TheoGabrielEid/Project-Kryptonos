@@ -1,0 +1,62 @@
+/* ==============================================================================
+   KryptonOS Universal Window Titlebar & Navigation Controls (Catppuccin Mocha)
+   Applies native navigation controls (🗕 Minimize, 🗖 Maximize, ✕ Close) to ALL GTK apps
+   ============================================================================== */
+
+headerbar,
+.titlebar {
+    background-color: #181825;
+    color: #cdd6f4;
+    border-bottom: 1px solid rgba(203, 166, 247, 0.2);
+    min-height: 38px;
+    padding-left: 8px;
+    padding-right: 8px;
+}
+
+headerbar:backdrop,
+.titlebar:backdrop {
+    background-color: #11111b;
+    color: #a6adc8;
+}
+
+/* Ensure navigation buttons are ALWAYS visible regardless of tiled/floating state */
+headerbar button.titlebutton,
+headerbar windowhandle box.right button,
+.titlebar button.titlebutton {
+    min-height: 26px;
+    min-width: 26px;
+    padding: 3px 9px;
+    margin: 2px 2px;
+    border-radius: 6px;
+    border: none;
+    background: transparent;
+    color: #cdd6f4;
+    font-size: 13px;
+    font-weight: bold;
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+headerbar button.titlebutton:hover,
+.titlebar button.titlebutton:hover {
+    background-color: #45475a;
+    color: #ffffff;
+}
+
+headerbar button.titlebutton.close:hover,
+headerbar button.titlebutton:last-child:hover,
+.titlebar button.titlebutton.close:hover {
+    background-color: #f38ba8;
+    color: #11111b;
+}
+
+headerbar button.titlebutton.maximize:hover {
+    background-color: #cba6f7;
+    color: #11111b;
+}
+
+headerbar button.titlebutton.minimize:hover {
+    background-color: #89b4fa;
+    color: #11111b;
+}

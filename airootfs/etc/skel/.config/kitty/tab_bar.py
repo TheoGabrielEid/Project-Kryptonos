@@ -67,17 +67,17 @@ def handle_button_click(os_win_id, x, is_double=False, total_cols=80, cell_w=10.
         col = int(float(x) / max(1.0, float(cell_w)))
         cols_from_right = total_cols - col
 
-        # Navigation buttons occupy the last 15 columns:
+        # Navigation buttons occupy the last 14 columns:
         # [✕] Close: 0 to 5 cols from right
         if cols_from_right <= 5:
             do_close(os_win_id)
             return True
-        # [🗖] Maximize / Windowed: 5 to 10 cols from right
-        elif cols_from_right <= 10:
+        # [🗖] Maximize / Windowed: 5 to 9 cols from right
+        elif cols_from_right <= 9:
             do_maximize()
             return True
-        # [🗕] Minimize: 10 to 15 cols from right
-        elif cols_from_right <= 15:
+        # [🗕] Minimize: 9 to 14 cols from right
+        elif cols_from_right <= 14:
             do_minimize()
             return True
         # Double click anywhere on empty tab bar toggles maximize / windowed
@@ -196,7 +196,7 @@ def draw_tab(
 
     # If this is the last tab, render spacer and window control buttons on the right
     if is_last:
-        btns_len = 15  # 5 cols for min, 5 cols for max, 5 cols for close
+        btns_len = 14  # Space budget for buttons: 4 for min, 4 for max, 4 for close, 2 padding
         target_x = max(end, screen.columns - btns_len)
         if screen.cursor.x < target_x:
             screen.cursor.bg = draw_data.default_bg
@@ -211,21 +211,21 @@ def draw_tab(
             screen.cursor.fg = as_rgb(0x89b4fa)
         except Exception:
             screen.cursor.fg = 0x89b4fa
-        screen.draw("  🗕  ")
+        screen.draw("  🗕 ")
 
         # Draw Maximize / Windowed button [ 🗖 ] (Catppuccin Mauve)
         try:
             screen.cursor.fg = as_rgb(0xcba6f7)
         except Exception:
             screen.cursor.fg = 0xcba6f7
-        screen.draw("  🗖  ")
+        screen.draw("  🗖 ")
 
         # Draw Close button [ ✕ ] (Catppuccin Red)
         try:
             screen.cursor.fg = as_rgb(0xf38ba8)
         except Exception:
             screen.cursor.fg = 0xf38ba8
-        screen.draw("  ✕  ")
+        screen.draw("  ✕ ")
         return screen.cursor.x
 
     return end

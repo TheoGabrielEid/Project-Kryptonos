@@ -17,6 +17,13 @@ xdg-mime default helium-browser.desktop x-scheme-handler/https 2>/dev/null || tr
 xdg-mime default helium-browser.desktop text/html 2>/dev/null || true
 xdg-mime default thunar.desktop inode/directory 2>/dev/null || true
 
+# Ensure all GTK apps have universal navigation buttons & Catppuccin titlebars
+mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
+cp -f /etc/skel/.config/gtk-3.0/settings.ini "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null || true
+cp -f /etc/skel/.config/gtk-3.0/gtk.css "$HOME/.config/gtk-3.0/gtk.css" 2>/dev/null || true
+cp -f /etc/skel/.config/gtk-4.0/settings.ini "$HOME/.config/gtk-4.0/settings.ini" 2>/dev/null || true
+cp -f /etc/skel/.config/gtk-4.0/gtk.css "$HOME/.config/gtk-4.0/gtk.css" 2>/dev/null || true
+
 # Ensure Kitty terminal has the latest custom tab bar & window controls
 mkdir -p "$HOME/.config/kitty"
 if [ -f /etc/skel/.config/kitty/tab_bar.py ]; then
