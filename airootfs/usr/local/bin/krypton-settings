@@ -266,6 +266,7 @@ class KryptonSettingsWindow(Gtk.Window):
         main_vbox.pack_start(self.stack, True, True, 0)
 
         self.build_coding_workspace_page()
+        self.build_window_modes_page()
         self.build_display_page()
         self.build_wallpaper_page()
         self.build_performance_page()
@@ -393,6 +394,221 @@ class KryptonSettingsWindow(Gtk.Window):
         page.pack_start(shortcuts_sec, False, False, 0)
 
         self.stack.add_titled(self.wrap_scrolled(page), "coding_workspace", "Coding Workspace")
+
+    def build_window_modes_page(self):
+        page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+
+        sec_intro = make_section(
+            "Window Management Style & Desktop Workflow",
+            "Switch seamlessly between Windows Style (free-floating, draggable, edge-resizable windows with titlebars) and Hyprland Tiling (smart automatic split-grid windows).",
+        )
+        page.pack_start(sec_intro, False, False, 0)
+
+        # Mode Selection Grid with Visual Previews
+        grid = Gtk.Grid()
+        grid.set_column_spacing(16)
+        grid.set_row_spacing(16)
+        grid.set_column_homogeneous(True)
+
+        cur_mode = run_cmd("/usr/local/bin/krypton-win-ctl get-mode") or "hyprland"
+
+        # Card 1: Windows Style
+        card_win = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card_win.get_style_context().add_class("mode-card-active" if cur_mode == "windows" else "mode-card")
+
+        lbl_win_title = Gtk.Label(label="🪟 Windows Style (Floating & Resizable)", xalign=0)
+        lbl_win_title.get_style_context().add_class("section-title")
+        card_win.pack_start(lbl_win_title, False, False, 0)
+
+        lbl_win_desc = Gtk.Label(
+            label="• Free-floating windows just like Microsoft Windows / macOS\n• Drag window titlebar or Super+LeftClick to move\n• Drag window borders or Super+RightClick to resize\n• Minimize, Maximize, Close controls on every app\n• Overlapping windows with independent sizes",
+            xalign=0,
+        )
+        lbl_win_desc.get_style_context().add_class("row-subtitle")
+        card_win.pack_start(lbl_win_desc, False, False, 0)
+
+        # Visual preview drawing area for Windows style
+        darea_win = Gtk.DrawingArea()
+        darea_win.set_size_request(-1, 140)
+        darea_win.get_style_context().add_class("mode-preview-box")
+        def draw_windows_preview(widget, cr):
+            alloc = widget.get_allocation()
+            w, h = alloc.width, alloc.height
+            # Desktop background
+            cr.set_source_rgb(0.07, 0.07, 0.11)
+            cr.paint()
+            # Top panel/bar
+            cr.set_source_rgb(0.12, 0.12, 0.18)
+            cr.rectangle(0, 0, w, 16)
+            cr.fill()
+            # Window 1 (back, left)
+            cr.set_source_rgb(0.16, 0.16, 0.24)
+            cr.rectangle(16, 26, w * 0.52, h * 0.65)
+            cr.fill()
+            cr.set_source_rgb(0.25, 0.25, 0.35)
+            cr.set_line_width(2)
+            cr.stroke()
+            # Window 1 titlebar
+            cr.set_source_rgb(0.20, 0.20, 0.30)
+            cr.rectangle(16, 26, w * 0.52, 14)
+            cr.fill()
+            # Window 1 buttons
+            cr.set_source_rgb(0.95, 0.55, 0.66)
+            cr.arc(16 + w * 0.52 - 8, 33, 3, 0, 6.28)
+            cr.fill()
+
+            # Window 2 (front, right - overlapping)
+            cr.set_source_rgb(0.18, 0.18, 0.28)
+            cr.rectangle(w * 0.35, 42, w * 0.55, h * 0.68)
+            cr.fill()
+            cr.set_source_rgb(0.79, 0.65, 0.97) # Active purple border
+            cr.set_line_width(2)
+            cr.stroke()
+            # Window 2 titlebar
+            cr.set_source_rgb(0.24, 0.24, 0.36)
+            cr.rectangle(w * 0.35, 42, w * 0.55, 16)
+            cr.fill()
+            # Window 2 buttons (Min, Max, Close)
+            cr.set_source_rgb(0.65, 0.89, 0.63)
+            cr.arc(w * 0.35 + w * 0.55 - 24, 50, 3, 0, 6.28)
+            cr.fill()
+            cr.set_source_rgb(0.98, 0.89, 0.69)
+            cr.arc(w * 0.35 + w * 0.55 - 16, 50, 3, 0, 6.28)
+            cr.fill()
+            cr.set_source_rgb(0.95, 0.55, 0.66)
+            cr.arc(w * 0.35 + w * 0.55 - 8, 50, 3, 0, 6.28)
+            cr.fill()
+            return True
+        darea_win.connect("draw", draw_windows_preview)
+        card_win.pack_start(darea_win, False, False, 0)
+
+        btn_win = Gtk.Button(label="✅ Active (Windows Style)" if cur_mode == "windows" else "Apply Windows Style")
+        btn_win.get_style_context().add_class("primary-btn" if cur_mode == "windows" else "action-btn")
+        card_win.pack_start(btn_win, False, False, 0)
+        grid.attach(card_win, 0, 0, 1, 1)
+
+        # Card 2: Hyprland Tiling
+        card_hypr = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        card_hypr.get_style_context().add_class("mode-card-active" if cur_mode == "hyprland" else "mode-card")
+
+        lbl_hypr_title = Gtk.Label(label="🔲 Hyprland Tiling (Automatic Grid)", xalign=0)
+        lbl_hypr_title.get_style_context().add_class("section-title")
+        card_hypr.pack_start(lbl_hypr_title, False, False, 0)
+
+        lbl_hypr_desc = Gtk.Label(
+            label="• Smart dynamic tiling layout (Dwindle auto-splitting)\n• Windows neatly tile side-by-side with zero wasted space\n• Drag windows with Super+LeftClick to swap layout positions\n• Resize tiling splits with Super+RightClick or border drag\n• Fast keyboard-driven workflow with instant focus navigation",
+            xalign=0,
+        )
+        lbl_hypr_desc.get_style_context().add_class("row-subtitle")
+        card_hypr.pack_start(lbl_hypr_desc, False, False, 0)
+
+        # Visual preview drawing area for Hyprland tiling
+        darea_hypr = Gtk.DrawingArea()
+        darea_hypr.set_size_request(-1, 140)
+        darea_hypr.get_style_context().add_class("mode-preview-box")
+        def draw_hypr_preview(widget, cr):
+            alloc = widget.get_allocation()
+            w, h = alloc.width, alloc.height
+            # Desktop background
+            cr.set_source_rgb(0.07, 0.07, 0.11)
+            cr.paint()
+            # Top panel/bar
+            cr.set_source_rgb(0.12, 0.12, 0.18)
+            cr.rectangle(0, 0, w, 16)
+            cr.fill()
+            gap = 6
+            top_y = 22
+            avail_h = h - top_y - gap
+            # Left Master Tile
+            tile1_w = (w - (gap * 3)) * 0.5
+            cr.set_source_rgb(0.18, 0.18, 0.28)
+            cr.rectangle(gap, top_y, tile1_w, avail_h)
+            cr.fill()
+            cr.set_source_rgb(0.79, 0.65, 0.97) # Active purple border
+            cr.set_line_width(2)
+            cr.stroke()
+
+            # Right Top Subtile
+            tile2_x = gap + tile1_w + gap
+            tile2_w = (w - (gap * 3)) * 0.5
+            tile2_h = (avail_h - gap) * 0.5
+            cr.set_source_rgb(0.16, 0.16, 0.24)
+            cr.rectangle(tile2_x, top_y, tile2_w, tile2_h)
+            cr.fill()
+            cr.set_source_rgb(0.25, 0.25, 0.35)
+            cr.set_line_width(1.5)
+            cr.stroke()
+
+            # Right Bottom Subtile
+            tile3_y = top_y + tile2_h + gap
+            cr.set_source_rgb(0.16, 0.16, 0.24)
+            cr.rectangle(tile2_x, tile3_y, tile2_w, tile2_h)
+            cr.fill()
+            cr.set_source_rgb(0.25, 0.25, 0.35)
+            cr.set_line_width(1.5)
+            cr.stroke()
+            return True
+        darea_hypr.connect("draw", draw_hypr_preview)
+        card_hypr.pack_start(darea_hypr, False, False, 0)
+
+        btn_hypr = Gtk.Button(label="✅ Active (Hyprland Tiling)" if cur_mode == "hyprland" else "Apply Hyprland Tiling")
+        btn_hypr.get_style_context().add_class("primary-btn" if cur_mode == "hyprland" else "action-btn")
+        card_hypr.pack_start(btn_hypr, False, False, 0)
+        grid.attach(card_hypr, 1, 0, 1, 1)
+
+        page.pack_start(grid, False, False, 0)
+
+        # Connect button click handlers
+        def apply_mode(target):
+            subprocess.run(["/usr/local/bin/krypton-win-ctl", "set-mode", target], check=False)
+            card_win.get_style_context().remove_class("mode-card-active")
+            card_win.get_style_context().remove_class("mode-card")
+            card_hypr.get_style_context().remove_class("mode-card-active")
+            card_hypr.get_style_context().remove_class("mode-card")
+            btn_win.get_style_context().remove_class("primary-btn")
+            btn_win.get_style_context().remove_class("action-btn")
+            btn_hypr.get_style_context().remove_class("primary-btn")
+            btn_hypr.get_style_context().remove_class("action-btn")
+
+            if target == "windows":
+                card_win.get_style_context().add_class("mode-card-active")
+                card_hypr.get_style_context().add_class("mode-card")
+                btn_win.set_label("✅ Active (Windows Style)")
+                btn_win.get_style_context().add_class("primary-btn")
+                btn_hypr.set_label("Apply Hyprland Tiling")
+                btn_hypr.get_style_context().add_class("action-btn")
+                self.notify("Switched to Windows Style: Floating & Resizable Desktops!")
+            else:
+                card_hypr.get_style_context().add_class("mode-card-active")
+                card_win.get_style_context().add_class("mode-card")
+                btn_hypr.set_label("✅ Active (Hyprland Tiling)")
+                btn_hypr.get_style_context().add_class("primary-btn")
+                btn_win.set_label("Apply Windows Style")
+                btn_win.get_style_context().add_class("action-btn")
+                self.notify("Switched to Hyprland Tiling: Smart Auto-Split Grid!")
+
+        btn_win.connect("clicked", lambda _: apply_mode("windows"))
+        btn_hypr.connect("clicked", lambda _: apply_mode("hyprland"))
+
+        # Window Navigation Shortcuts Reference
+        sec_tips = make_section("Window Mouse & Keyboard Shortcuts", "Standard navigation controls in both modes")
+        shortcuts = [
+            ("Move / Drag Window", "Hold Super and drag with Left Mouse Button (or drag titlebar)", "Super + LeftClick"),
+            ("Resize Window", "Hold Super and drag with Right Mouse Button (or drag borders directly)", "Super + RightClick"),
+            ("Toggle Floating / Tiling", "Switch active window between floating and tiled instantly", "Super + W"),
+            ("Full Screen / Maximize", "Toggle fullscreen for active window (F11 or Super+F / Super+M)", "Super + F  /  Super + M"),
+            ("Minimize Window", "Minimize active window to tray (Super+I)", "Super + I"),
+            ("Restore Minimized Window", "Bring back minimized window (Super+Shift+I)", "Super + Shift + I"),
+            ("Close / Exit Application", "Close active application safely (Super+Q or Alt+F4)", "Super + Q"),
+        ]
+        for title, subtitle, badge_text in shortcuts:
+            lbl = Gtk.Label(label=f" {badge_text} ")
+            lbl.get_style_context().add_class("status-banner")
+            sec_tips.pack_start(make_row(title, subtitle, lbl), False, False, 0)
+        page.pack_start(sec_tips, False, False, 0)
+
+        self.stack.add_titled(self.wrap_scrolled(page), "window_modes", "Window Modes")
+
     def build_display_page(self):
         page = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
 

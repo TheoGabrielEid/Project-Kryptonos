@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# KryptonOS Window Control Helper
-# Actions: close [addr] | toggle-float [addr] | fullscreen [addr]
+# KryptonOS Universal Window Controls & Mode Manager
+# Actions:
+#   close [addr] | maximize [addr] | minimize [addr] | restore
+#   toggle-float [addr] | get-mode | set-mode <windows|hyprland> | status
 # ==============================================================================
-ACTION="${1:-close}"
+ACTION="${1:-status}"
 ARG="${2:-}"
+MODE_FILE="$HOME/.config/hypr/.window_mode"
+MODE_CONF="$HOME/.config/hypr/window_mode.conf"
 
 format_addr() {
     local a="$1"
@@ -19,6 +23,81 @@ format_addr() {
     fi
 }
 
+get_current_mode() {
+    if [ -f "$MODE_FILE" ]; then
+        cat "$MODE_FILE" 2>/dev/null | tr -d '[:space:]'
+    else
+        echo "hyprland"
+    fi
+}
+
+set_window_mode() {
+    local target="$1"
+    mkdir -p "$HOME/.config/hypr"
+
+    if [ "$target" = "windows" ]; then
+        echo "windows" > "$MODE_FILE"
+        cat << 'EOF' > "$MODE_CONF"
+# ==============================================================================
+# KryptonOS Window Mode Configuration
+# Mode: Windows Style (Floating & Resizable)
+# ==============================================================================
+windowrule = match:class .*, float true
+windowrule = match:class .*, center true
+
+general {
+    layout = dwindle
+    resize_on_border = true
+    extend_border_grab_area = 15
+    hover_icon_on_border = true
+}
+EOF
+        # Reload Hyprland to apply configuration
+        hyprctl reload >/dev/null 2>&1 || true
+
+        # Float all currently open windows
+        if command -v jq >/dev/null 2>&1; then
+            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[].address // empty'); do
+                hyprctl dispatch setfloating "address:${addr}" >/dev/null 2>&1 || true
+            done
+        fi
+
+        notify-send "Window Mode: Windows Style" "Floating windows active. Drag titlebars or borders to move and resize." --icon=preferences-system -u normal
+    else
+        echo "hyprland" > "$MODE_FILE"
+        cat << 'EOF' > "$MODE_CONF"
+# ==============================================================================
+# KryptonOS Window Mode Configuration
+# Mode: Hyprland Tiling (Automatic Grid)
+# ==============================================================================
+general {
+    layout = dwindle
+    resize_on_border = true
+    extend_border_grab_area = 15
+    hover_icon_on_border = true
+}
+
+dwindle {
+    preserve_split = true
+    smart_split = false
+    smart_resizing = true
+}
+EOF
+        # Reload Hyprland to apply configuration
+        hyprctl reload >/dev/null 2>&1 || true
+
+        # Tile all open regular app windows
+        if command -v jq >/dev/null 2>&1; then
+            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "pavucontrol" and .class != "blueman-manager" and .class != "org.gnome.Calculator" and .class != "krypton-settings" and .class != "krypton-themes" and .class != "file-roller" and .class != "scratchpad" and .class != "kproj") | .address // empty'); do
+                hyprctl dispatch settiled "address:${addr}" >/dev/null 2>&1 || true
+            done
+        fi
+
+        notify-send "Window Mode: Hyprland Tiling" "Dynamic auto-tiling grid active with zero wasted screen space." --icon=preferences-system -u normal
+    fi
+    sync 2>/dev/null || true
+}
+
 case "$ACTION" in
     close)
         TARGET_ADDR=$(format_addr "${ARG:-}")
@@ -28,12 +107,22 @@ case "$ACTION" in
             hyprctl dispatch killactive
         fi
         ;;
-    fullscreen)
+    maximize|fullscreen)
         TARGET_ADDR=$(format_addr "${ARG:-}")
         if [ -n "$TARGET_ADDR" ]; then
             hyprctl dispatch focuswindow "${TARGET_ADDR}"
         fi
-        hyprctl dispatch fullscreen 0
+        hyprctl dispatch fullscreen 1
+        ;;
+    minimize)
+        TARGET_ADDR=$(format_addr "${ARG:-}")
+        if [ -n "$TARGET_ADDR" ]; then
+            hyprctl dispatch focuswindow "${TARGET_ADDR}"
+        fi
+        hyprctl dispatch movetoworkspacesilent special:minimized
+        ;;
+    restore)
+        hyprctl dispatch togglespecialworkspace minimized
         ;;
     toggle-float)
         TARGET_ADDR=$(format_addr "${ARG:-}")
@@ -41,6 +130,15 @@ case "$ACTION" in
             hyprctl dispatch focuswindow "${TARGET_ADDR}"
         fi
         hyprctl dispatch togglefloating
+        ;;
+    get-mode)
+        get_current_mode
+        ;;
+    set-mode)
+        set_window_mode "${ARG:-hyprland}"
+        ;;
+    status)
+        get_current_mode
         ;;
     *)
         hyprctl dispatch killactive
