@@ -29,6 +29,7 @@ ALWAYS_FLOAT_CLASSES = {
     "scratchpad",
     "kproj",
     "lazygit",
+    "kitty",
 }
 
 
