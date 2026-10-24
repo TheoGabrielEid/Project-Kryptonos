@@ -1,0 +1,23 @@
+[Desktop Entry]
+Name=Thunar File Manager
+Name[en_US]=Files
+Comment=Browse the filesystem with the file manager
+GenericName=File Manager
+Exec=thunar %F
+Icon=org.xfce.thunar
+Terminal=false
+StartupNotify=true
+Type=Application
+Categories=System;Utility;Core;GTK;FileTools;FileManager;
+MimeType=inode/directory;
+Actions=open-home;open-trash;
+
+[Desktop Action open-home]
+Name=Home
+Exec=thunar ~
+Icon=user-home
+
+[Desktop Action open-trash]
+Name=Trash
+Exec=thunar trash:///
+Icon=user-trash

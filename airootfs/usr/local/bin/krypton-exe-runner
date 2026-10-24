@@ -22,7 +22,7 @@ def show_install_dialog(exe_path):
     try:
         import gi
         gi.require_version('Gtk', '3.0')
-        from gi.repository import Gtk, Gdk, GLib
+        from gi.repository import Gtk, Gdk
 
         dialog = Gtk.Dialog(
             title="KryptonOS - Windows App Support",
@@ -94,11 +94,18 @@ def show_install_dialog(exe_path):
 
 def install_wine_and_run(exe_path=None):
     """Installs Wine package and then runs the target executable."""
-    notify("Installing Wine Support", "Downloading and configuring Windows compatibility subsystem...", icon="software-properties")
-    cmd = "sudo pacman -Sy --noconfirm wine winetricks"
+    notify("Installing Wine Support", "Configuring Windows compatibility subsystem...", icon="software-properties")
+    # Check if local cache has packages
+    pkg_cache = Path("/var/cache/pacman/pkg")
+    wine_pkgs = list(pkg_cache.glob("wine*.pkg.tar.zst"))
+    if wine_pkgs:
+        cmd = "sudo pacman -U --noconfirm /var/cache/pacman/pkg/wine*.pkg.tar.zst"
+    else:
+        cmd = "sudo pacman -Sy --noconfirm wine winetricks"
+    
     if exe_path:
         cmd += f" && krypton-exe-runner '{exe_path}'"
-    subprocess.Popen(["kitty", "--title", "KryptonOS - Installing Wine Support", "bash", "-c", f"{cmd}; echo 'Press enter to exit'; read"])
+    subprocess.Popen(["kitty", "--title", "KryptonOS - Installing Wine Support", "bash", "-c", f"{cmd}; echo 'Installation complete. Press enter to exit'; read"])
 
 def run_exe(exe_path, args=None):
     """Launch the Windows executable with optimized Wine environment."""
@@ -109,13 +116,22 @@ def run_exe(exe_path, args=None):
 
     wine_bin = shutil.which("wine") or "/usr/bin/wine"
     if not os.path.exists(wine_bin):
-        if show_install_dialog(exe_path):
-            install_wine_and_run(exe_path)
-        return
+        # Look for wine64 or wine in other locations
+        if os.path.exists("/usr/bin/wine64"):
+            wine_bin = "/usr/bin/wine64"
+        else:
+            if show_install_dialog(exe_path):
+                install_wine_and_run(exe_path)
+            return
 
     exe_file = Path(exe_path).resolve()
     workdir = str(exe_file.parent)
     name = exe_file.name
+
+    # Check if wineprefix exists, if not notify user that it's initializing
+    wineprefix = Path(os.environ.get("WINEPREFIX", Path.home() / ".wine"))
+    if not wineprefix.exists():
+        notify("First-Time Windows Setup", "Configuring Windows prefix for first launch...", icon="wine")
 
     notify("Launching Windows Application", f"Starting {name} via Wine...", icon="wine")
 
@@ -127,9 +143,16 @@ def run_exe(exe_path, args=None):
     env["DXVK_ASYNC"] = "1"
     env["WINEARCH"] = "win64"
 
-    # Launch detached with working directory set to executable's directory
-    # so adjacent DLLs and assets load correctly
-    cmd = [wine_bin, "start", "/unix", str(exe_file)]
+    # Determine command based on extension
+    suffix = exe_file.suffix.lower()
+    if suffix == ".msi":
+        msi_bin = shutil.which("msiexec") or "msiexec"
+        cmd = [msi_bin, "/i", str(exe_file)]
+    elif suffix in (".bat", ".cmd"):
+        cmd = [wine_bin, "cmd", "/c", str(exe_file)]
+    else:
+        cmd = [wine_bin, str(exe_file)]
+
     if args:
         cmd.extend(args)
 
