@@ -11,6 +11,12 @@ import types
 from kitty.fast_data_types import Screen, get_boss
 from kitty.tab_bar import DrawData, ExtraData, TabBarData
 
+try:
+    from kitty.tab_bar import as_rgb
+except ImportError:
+    def as_rgb(val):
+        return val
+
 _patched = False
 _last_cols = 80
 _last_cell_w = 10.0
@@ -191,23 +197,35 @@ def draw_tab(
     # If this is the last tab, render spacer and window control buttons on the right
     if is_last:
         btns_len = 15  # 5 cols for min, 5 cols for max, 5 cols for close
-        pad = screen.columns - screen.cursor.x - btns_len
-        if pad > 0:
+        target_x = max(end, screen.columns - btns_len)
+        if screen.cursor.x < target_x:
             screen.cursor.bg = draw_data.default_bg
             screen.cursor.fg = draw_data.inactive_fg
-            screen.draw(" " * pad)
+            screen.draw(" " * (target_x - screen.cursor.x))
+
+        screen.cursor.x = target_x
 
         # Draw Minimize button [ 🗕 ] (Catppuccin Blue)
         screen.cursor.bg = draw_data.default_bg
-        screen.cursor.fg = 0x89b4fa
+        try:
+            screen.cursor.fg = as_rgb(0x89b4fa)
+        except Exception:
+            screen.cursor.fg = 0x89b4fa
         screen.draw("  🗕  ")
 
         # Draw Maximize / Windowed button [ 🗖 ] (Catppuccin Mauve)
-        screen.cursor.fg = 0xcba6f7
+        try:
+            screen.cursor.fg = as_rgb(0xcba6f7)
+        except Exception:
+            screen.cursor.fg = 0xcba6f7
         screen.draw("  🗖  ")
 
         # Draw Close button [ ✕ ] (Catppuccin Red)
-        screen.cursor.fg = 0xf38ba8
+        try:
+            screen.cursor.fg = as_rgb(0xf38ba8)
+        except Exception:
+            screen.cursor.fg = 0xf38ba8
         screen.draw("  ✕  ")
+        return screen.cursor.x
 
     return end

@@ -29,13 +29,15 @@ fi
 format_addr() {
     local a="$1"
     if [ -n "$a" ]; then
-        if [[ "$a" != address:* ]]; then
-            if [[ "$a" != 0x* ]]; then
-                a="0x$a"
-            fi
-            a="address:$a"
+        local raw="${a#address:}"
+        if [[ "$raw" != 0x* ]]; then
+            raw="0x$raw"
         fi
-        echo "$a"
+        if [[ ! "$raw" =~ ^0x[0-9a-fA-F]+$ ]]; then
+            echo ""
+            return 1
+        fi
+        echo "address:$raw"
     fi
 }
 

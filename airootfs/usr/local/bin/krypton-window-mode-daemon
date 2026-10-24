@@ -7,6 +7,7 @@ Listens on Hyprland's socket2 for openwindow events and enforces the active mode
 import glob
 import json
 import os
+import re
 import signal
 import socket
 import subprocess
@@ -106,6 +107,8 @@ def enforce_window(addr, wclass=""):
         return
     if not addr.startswith("0x"):
         addr = f"0x{addr}"
+    if not re.match(r"^0x[0-9a-fA-F]+$", addr):
+        return
     mode = get_mode()
     if mode == "windows":
         hctl_dispatch("setfloating", f"address:{addr}")

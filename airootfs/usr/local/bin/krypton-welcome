@@ -17,5 +17,14 @@ xdg-mime default helium-browser.desktop x-scheme-handler/https 2>/dev/null || tr
 xdg-mime default helium-browser.desktop text/html 2>/dev/null || true
 xdg-mime default thunar.desktop inode/directory 2>/dev/null || true
 
+# Ensure Kitty terminal has the latest custom tab bar & window controls
+mkdir -p "$HOME/.config/kitty"
+if [ -f /etc/skel/.config/kitty/tab_bar.py ]; then
+    cp -f /etc/skel/.config/kitty/tab_bar.py "$HOME/.config/kitty/tab_bar.py" 2>/dev/null || true
+fi
+if [ -f /etc/skel/.config/kitty/kitty.conf ]; then
+    cp -f /etc/skel/.config/kitty/kitty.conf "$HOME/.config/kitty/kitty.conf" 2>/dev/null || true
+fi
+
 sleep 2
 notify-send "Welcome to KryptonOS Developer Edition" "Coding Workspace Ready: Super+C (VS Code), Super+N (Neovim), Super+\` (Scratchpad), Super+G (Git)." --icon=/usr/share/pixmaps/kryptonos.png -u normal

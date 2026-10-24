@@ -11,10 +11,14 @@ case "$URL" in
     *krypton-action:close*|*krypton-action%3Aclose*|*krypton-action:exit*|*krypton-action%3Aexit*)
         /usr/local/bin/krypton-win-ctl close
         ;;
-    http://*|https://*|file://*)
+    http://*|https://*|ftp://*|mailto:*)
+        helium-browser "$URL" &
+        ;;
+    file://*)
         helium-browser "$URL" &
         ;;
     *)
-        xdg-open "$URL" &
+        echo "Blocked unsupported or unsafe URL scheme: $URL" >&2
+        exit 1
         ;;
 esac

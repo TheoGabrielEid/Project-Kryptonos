@@ -8,6 +8,7 @@ import glob
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import traceback
@@ -194,7 +195,8 @@ entry:focus {
 
 def run_cmd(cmd):
     try:
-        res = subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=5)
+        args = shlex.split(cmd) if isinstance(cmd, str) else cmd
+        res = subprocess.run(args, capture_output=True, text=True, timeout=5)
         return res.stdout.strip()
     except Exception:
         return ""
@@ -348,7 +350,7 @@ class KryptonSettingsWindow(Gtk.Window):
 
     def notify(self, msg):
         self.status_label.set_text(f"✅  {msg}")
-        subprocess.Popen(f"notify-send 'KryptonOS Settings' '{msg}' --icon=preferences-system", shell=True)
+        subprocess.Popen(["notify-send", "KryptonOS Settings", str(msg), "--icon=preferences-system"])
 
     def wrap_scrolled(self, content_box):
         scrolled = Gtk.ScrolledWindow()
@@ -814,7 +816,7 @@ class KryptonSettingsWindow(Gtk.Window):
 
         open_btn = Gtk.Button(label="Open Folder in Thunar")
         open_btn.get_style_context().add_class("action-btn")
-        open_btn.connect("clicked", lambda _: subprocess.Popen(f"thunar '{user_wall_dir}'", shell=True))
+        open_btn.connect("clicked", lambda _: subprocess.Popen(["thunar", user_wall_dir]))
         sec2.pack_start(make_row("Open Wallpapers Folder", user_wall_dir, open_btn), False, False, 0)
         page.pack_start(sec2, False, False, 0)
 
@@ -839,8 +841,8 @@ class KryptonSettingsWindow(Gtk.Window):
         except Exception:
             pass
 
-        subprocess.Popen(f"/usr/local/bin/krypton-wallpaper '{path}'", shell=True)
-        subprocess.run("sync", shell=True)
+        subprocess.Popen(["/usr/local/bin/krypton-wallpaper", path])
+        subprocess.run(["sync"])
         self.notify(f"Wallpaper set to: {title}")
 
     def build_performance_page(self):
@@ -1217,7 +1219,11 @@ class KryptonSettingsWindow(Gtk.Window):
             text=True,
             capture_output=True,
         )
-        subprocess.run(["sudo", "sh", "-c", f"echo '{uname} ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/krypton-{uname} && chmod 0440 /etc/sudoers.d/krypton-{uname}"])
+        sudoers_path = f"/etc/sudoers.d/krypton-{uname}"
+        sudoers_rule = f"{uname} ALL=(ALL) NOPASSWD: ALL\n".encode("utf-8")
+        tee_proc = subprocess.Popen(["sudo", "tee", sudoers_path], stdin=subprocess.PIPE, stdout=subprocess.DEVNULL)
+        tee_proc.communicate(input=sudoers_rule)
+        subprocess.run(["sudo", "chmod", "0440", sudoers_path])
         subprocess.run(["sudo", "sync"])
         if res.returncode == 0:
             self.new_user_entry.set_text("")
@@ -1263,28 +1269,28 @@ class KryptonSettingsWindow(Gtk.Window):
         sync_btn.get_style_context().add_class("primary-btn")
         sync_btn.connect(
             "clicked",
-            lambda _: (subprocess.run("sync", shell=True), self.notify("All data flushed to permanent NVMe disk!")),
+            lambda _: (subprocess.run(["sync"]), self.notify("All data flushed to permanent NVMe disk!")),
         )
         sec_persist.pack_start(make_row("Storage Status", get_persistence_status(), sync_btn), False, False, 0)
         page.pack_start(sec_persist, False, False, 0)
 
         sec_tools = make_section("Apps, Browser & Hardware Control Panels", "Launch system utilities")
         tools = [
-            ("File Explorer (Thunar GUI)", "Graphical file manager with tabs, archives & volume management (Super+E)", "thunar"),
-            ("Terminal File Explorer (Yazi)", "Blazing-fast terminal file manager with previews (Super+Shift+E)", "kitty -e yazi"),
-            ("Helium Browser (Default Browser)", "Launch privacy-focused Helium Browser (Super+B)", "helium-browser"),
-            ("Audio & Microphone Mixer", "Configure speakers, headphones, and input volume", "pavucontrol"),
-            ("Network & Wi-Fi Connections", "Manage Ethernet, Wi-Fi, and VPN profiles", "nm-connection-editor"),
-            ("Bluetooth Devices", "Pair headphones, controllers, and keyboards", "blueman-manager"),
-            ("GTK Theme & Icons (nwg-look)", "Customize GTK themes, cursors, and fonts", "nwg-look"),
-            ("Qt6 Theme Settings (qt6ct)", "Customize Qt application appearance", "qt6ct"),
-            ("Disk Management (GNOME Disks)", "View partitions and disk health", "gnome-disks"),
-            ("System Resource Monitor (btop)", "Live CPU, GPU, RAM, and process monitor", "kitty -e btop"),
+            ("File Explorer (Thunar GUI)", "Graphical file manager with tabs, archives & volume management (Super+E)", ["thunar"]),
+            ("Terminal File Explorer (Yazi)", "Blazing-fast terminal file manager with previews (Super+Shift+E)", ["kitty", "-e", "yazi"]),
+            ("Helium Browser (Default Browser)", "Launch privacy-focused Helium Browser (Super+B)", ["helium-browser"]),
+            ("Audio & Microphone Mixer", "Configure speakers, headphones, and input volume", ["pavucontrol"]),
+            ("Network & Wi-Fi Connections", "Manage Ethernet, Wi-Fi, and VPN profiles", ["nm-connection-editor"]),
+            ("Bluetooth Devices", "Pair headphones, controllers, and keyboards", ["blueman-manager"]),
+            ("GTK Theme & Icons (nwg-look)", "Customize GTK themes, cursors, and fonts", ["nwg-look"]),
+            ("Qt6 Theme Settings (qt6ct)", "Customize Qt application appearance", ["qt6ct"]),
+            ("Disk Management (GNOME Disks)", "View partitions and disk health", ["gnome-disks"]),
+            ("System Resource Monitor (btop)", "Live CPU, GPU, RAM, and process monitor", ["kitty", "-e", "btop"]),
         ]
         for title, subtitle, cmd in tools:
             btn = Gtk.Button(label="Open")
             btn.get_style_context().add_class("action-btn")
-            btn.connect("clicked", lambda _, c=cmd: subprocess.Popen(c, shell=True))
+            btn.connect("clicked", lambda _, c=cmd: subprocess.Popen(c))
             sec_tools.pack_start(make_row(title, subtitle, btn), False, False, 0)
         page.pack_start(sec_tools, False, False, 0)
 
