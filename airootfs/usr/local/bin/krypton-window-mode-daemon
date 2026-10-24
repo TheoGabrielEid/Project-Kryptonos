@@ -157,6 +157,17 @@ def main():
                             addr = parts[0].strip()
                             wclass = parts[2].strip() if len(parts) > 2 else ""
                             handle_open(addr, wclass)
+                    elif line.startswith("minimized>>"):
+                        parts = line[len("minimized>>"):].split(",")
+                        if parts:
+                            raw_addr = parts[0].strip()
+                            state = parts[1].strip() if len(parts) > 1 else "1"
+                            addr = raw_addr if raw_addr.startswith("0x") else f"0x{raw_addr}"
+                            if re.match(r"^0x[0-9a-fA-F]+$", addr):
+                                if state == "1":
+                                    hctl_dispatch("movetoworkspacesilent", f"special:minimized,address:{addr}")
+                                else:
+                                    hctl_dispatch("movetoworkspace", f"+0,address:{addr}")
 
         except Exception:
             time.sleep(1)

@@ -28,6 +28,7 @@ def safe_as_rgb(c):
 _patched = False
 _last_cols = 80
 _last_cell_w = 10.0
+_last_win_w = 800.0
 
 
 def get_hypr_env():
@@ -44,51 +45,58 @@ def get_hypr_env():
 
 def do_close(os_win_id=0):
     try:
-        boss = get_boss()
-        if boss and hasattr(boss, "close_os_window"):
-            boss.close_os_window(os_win_id)
-            return
+        subprocess.Popen(["hyprctl", "dispatch", "killactive"], env=get_hypr_env())
     except Exception:
         pass
-    try:
-        subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "close"], env=get_hypr_env())
-    except Exception:
-        subprocess.Popen(["hyprctl", "dispatch", "killactive"], env=get_hypr_env())
 
 
 def do_maximize():
     try:
         subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"], env=get_hypr_env())
     except Exception:
-        subprocess.Popen(["hyprctl", "dispatch", "fullscreen", "1"], env=get_hypr_env())
+        pass
 
 
 def do_minimize():
     try:
         subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"], env=get_hypr_env())
     except Exception:
-        subprocess.Popen(["hyprctl", "dispatch", "movetoworkspacesilent", "special:minimized"], env=get_hypr_env())
+        pass
 
 
-def handle_button_click(os_win_id, x, is_double=False, total_cols=80, cell_w=10.0):
+def handle_button_click(os_win_id, x, is_double=False):
+    global _last_cell_w, _last_win_w
+    cw = _last_cell_w
+    vw = _last_win_w
     try:
-        col = int(float(x) / max(1.0, float(cell_w)))
-        cols_from_right = total_cols - col
+        from kitty.fast_data_types import cell_size_for_window, viewport_for_window
+        cw_val, _ = cell_size_for_window(os_win_id)
+        if cw_val and cw_val > 0:
+            cw = float(cw_val)
+        _, _, vw_val, _ = viewport_for_window(os_win_id)
+        if vw_val and vw_val > 0:
+            vw = float(vw_val)
+    except Exception:
+        pass
 
-        # Navigation buttons occupy the right side:
-        # [✕] Close: 0 to 5 cols from right
-        if cols_from_right <= 5:
+    try:
+        dist_px = vw - float(x)
+        cols_from_right = dist_px / max(1.0, cw)
+
+        # Buttons layout on right:
+        # [  ✕  ] Close button: 0 to 4.5 cols from right
+        if 0 <= cols_from_right <= 4.5:
             do_close(os_win_id)
             return True
-        # [🗖] Maximize / Windowed: 5 to 9 cols from right
-        elif cols_from_right <= 9:
+        # [  🗖 ] Maximize / Windowed: 4.5 to 8.5 cols from right
+        elif 4.5 < cols_from_right <= 8.5:
             do_maximize()
             return True
-        # [🗕] Minimize: 9 to 14 cols from right
-        elif cols_from_right <= 14:
+        # [  🗕 ] Minimize: 8.5 to 13.5 cols from right
+        elif 8.5 < cols_from_right <= 13.5:
             do_minimize()
             return True
-        # Double click anywhere on empty tab bar toggles maximize / windowed
+        # Double click anywhere on top tab bar: toggle Maximize / Windowed
         elif is_double:
             do_maximize()
             return True
@@ -99,12 +107,8 @@ def handle_button_click(os_win_id, x, is_double=False, total_cols=80, cell_w=10.
 
 def _krypton_boss_activate(self, os_window_id, x, is_double=False, *args, **kwargs):
     try:
-        tm = self.os_window_map.get(os_window_id)
-        if tm is not None:
-            cell_w = getattr(tm.tab_bar, "cell_width", _last_cell_w) or _last_cell_w
-            cols = getattr(tm.tab_bar.screen, "columns", _last_cols) or _last_cols
-            if handle_button_click(os_window_id, x, is_double=is_double, total_cols=cols, cell_w=cell_w):
-                return 0
+        if handle_button_click(os_window_id, x, is_double=is_double):
+            return 0
     except Exception:
         pass
 
@@ -115,10 +119,8 @@ def _krypton_boss_activate(self, os_window_id, x, is_double=False, *args, **kwar
 
 def _krypton_tm_activate(self, x, is_double=False, *args, **kwargs):
     try:
-        cell_w = getattr(self.tab_bar, "cell_width", _last_cell_w) or _last_cell_w
-        cols = getattr(self.tab_bar.screen, "columns", _last_cols) or _last_cols
         os_win_id = getattr(self, "os_window_id", 0)
-        if handle_button_click(os_win_id, x, is_double=is_double, total_cols=cols, cell_w=cell_w):
+        if handle_button_click(os_win_id, x, is_double=is_double):
             return
     except Exception:
         pass
@@ -138,6 +140,14 @@ def _ensure_patch():
         if not hasattr(Boss, "_krypton_orig_boss_activate"):
             Boss._krypton_orig_boss_activate = getattr(Boss, "activate_tab_at", None)
             Boss.activate_tab_at = _krypton_boss_activate
+    except Exception:
+        pass
+
+    try:
+        boss = get_boss()
+        if boss is not None and not hasattr(boss, "_krypton_inst_patched"):
+            boss.activate_tab_at = types.MethodType(_krypton_boss_activate, boss)
+            boss._krypton_inst_patched = True
     except Exception:
         pass
 
@@ -162,7 +172,7 @@ def draw_tab(
     is_last: bool,
     extra_data: ExtraData,
 ) -> int:
-    global _last_cols, _last_cell_w
+    global _last_cols, _last_cell_w, _last_win_w
     try:
         _ensure_patch()
     except Exception:
@@ -170,11 +180,14 @@ def draw_tab(
 
     _last_cols = screen.columns
     try:
-        from kitty.fast_data_types import cell_size_for_window
+        from kitty.fast_data_types import cell_size_for_window, viewport_for_window
         os_win = getattr(extra_data, "os_window_id", 0)
         cw, _ = cell_size_for_window(os_win)
         if cw:
             _last_cell_w = float(cw)
+        _, _, vw, _ = viewport_for_window(os_win)
+        if vw:
+            _last_win_w = float(vw)
     except Exception:
         pass
 

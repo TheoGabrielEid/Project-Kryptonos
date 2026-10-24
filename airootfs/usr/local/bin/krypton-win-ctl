@@ -155,25 +155,7 @@ case "$ACTION" in
         if [ -n "$TARGET_ADDR" ]; then
             hyprctl dispatch focuswindow "${TARGET_ADDR}"
         fi
-
-        # Cleanly toggle between Fullscreen / Maximized and Windowed
-        WIN_JSON=$(hyprctl activewindow -j 2>/dev/null)
-        IS_FS=$(echo "$WIN_JSON" | jq -r '.fullscreen // 0' 2>/dev/null || echo 0)
-        IS_FLOAT=$(echo "$WIN_JSON" | jq -r '.floating // false' 2>/dev/null || echo false)
-
-        if [ "$IS_FS" != "0" ] && [ "$IS_FS" != "false" ]; then
-            # Currently fullscreen/maximized: restore to windowed floating mode
-            hyprctl dispatch fullscreen 0
-            hyprctl dispatch setfloating
-            hyprctl dispatch resizeactive exact 1050 720
-            hyprctl dispatch centerwindow 1
-        elif [ "$IS_FLOAT" = "true" ]; then
-            # Currently windowed floating: maximize
-            hyprctl dispatch fullscreen 1
-        else
-            # Currently tiled: maximize if tiled, or toggle windowed
-            hyprctl dispatch fullscreen 1
-        fi
+        hyprctl dispatch fullscreen 1
         ;;
     minimize)
         TARGET_ADDR=$(format_addr "${ARG:-}")
