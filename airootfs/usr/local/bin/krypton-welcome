@@ -17,6 +17,11 @@ xdg-mime default helium-browser.desktop x-scheme-handler/https 2>/dev/null || tr
 xdg-mime default helium-browser.desktop text/html 2>/dev/null || true
 xdg-mime default thunar.desktop inode/directory 2>/dev/null || true
 
+# Configure GNOME/GTK window navigation buttons (Minimize, Maximize, Close)
+gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close' 2>/dev/null || true
+gsettings set org.gnome.desktop.interface gtk-decoration-layout 'appmenu:minimize,maximize,close' 2>/dev/null || true
+gsettings set org.gnome.desktop.wm.preferences action-double-click-titlebar 'toggle-maximize' 2>/dev/null || true
+
 # Ensure all GTK apps have universal navigation buttons & Catppuccin titlebars
 mkdir -p "$HOME/.config/gtk-3.0" "$HOME/.config/gtk-4.0"
 cp -f /etc/skel/.config/gtk-3.0/settings.ini "$HOME/.config/gtk-3.0/settings.ini" 2>/dev/null || true
@@ -31,6 +36,12 @@ if [ -f /etc/skel/.config/kitty/tab_bar.py ]; then
 fi
 if [ -f /etc/skel/.config/kitty/kitty.conf ]; then
     cp -f /etc/skel/.config/kitty/kitty.conf "$HOME/.config/kitty/kitty.conf" 2>/dev/null || true
+fi
+
+# Ensure Hyprland configuration is up to date
+mkdir -p "$HOME/.config/hypr"
+if [ -f /etc/skel/.config/hypr/hyprland.conf ]; then
+    cp -f /etc/skel/.config/hypr/hyprland.conf "$HOME/.config/hypr/hyprland.conf" 2>/dev/null || true
 fi
 
 sleep 2
