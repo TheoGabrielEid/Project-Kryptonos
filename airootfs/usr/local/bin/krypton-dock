@@ -50,7 +50,7 @@ DEFAULT_PINS = [
     {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code"},
     {"id": "git", "name": "LazyGit", "icon_name": "git", "cmd": "kitty --class lazygit -e lazygit", "class_match": "lazygit"},
     {"id": "browser", "name": "Helium Browser", "icon_name": "helium", "cmd": "helium-browser", "class_match": "helium|chromium|firefox"},
-    {"id": "files", "name": "Files", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar"},
+    {"id": "files", "name": "Files", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar|krypton-files"},
     {"id": "btop", "name": "System Monitor", "icon_name": "utilities-system-monitor", "cmd": "kitty --class btop -e btop", "class_match": "btop"},
     {"id": "settings", "name": "Settings", "icon_name": "preferences-system", "cmd": "/usr/local/bin/krypton-settings", "class_match": "krypton-settings"},
 ]
@@ -63,6 +63,7 @@ APP_ICON_MAP = {
     "chromium": ["chromium", "google-chrome", "web-browser"],
     "firefox": ["firefox", "web-browser"],
     "thunar": ["thunar", "org.xfce.thunar", "system-file-manager"],
+    "krypton-files": ["thunar", "org.xfce.thunar", "system-file-manager"],
     "files": ["thunar", "org.xfce.thunar", "system-file-manager"],
     "code": ["com.visualstudio.code", "visual-studio-code", "code-oss", "code"],
     "vscode": ["com.visualstudio.code", "visual-studio-code", "code-oss", "code"],
@@ -83,7 +84,7 @@ APP_ICON_MAP = {
 
 CATALOG_APPS = [
     {"id": "terminal", "name": "Terminal", "icon_name": "kitty", "cmd": "kitty", "class_match": "kitty"},
-    {"id": "files", "name": "Files (Thunar)", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar"},
+    {"id": "files", "name": "Files (File Explorer)", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar|krypton-files"},
     {"id": "browser", "name": "Helium Browser", "icon_name": "helium", "cmd": "helium-browser", "class_match": "helium|chromium"},
     {"id": "firefox", "name": "Firefox", "icon_name": "firefox", "cmd": "firefox", "class_match": "firefox"},
     {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code"},

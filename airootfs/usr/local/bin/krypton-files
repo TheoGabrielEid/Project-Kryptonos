@@ -1,0 +1,992 @@
+#!/usr/bin/env python3
+"""
+==============================================================================
+KryptonOS Native File Explorer (krypton-files)
+==============================================================================
+Features:
+- Native System Navigation Bar with window controls:
+  [ 🗕 Minimize ] [ 🗖 Maximize / Windowed ] [ ✕ Close ]
+- Draggable Titlebar when windowed (Windows style) & double-click maximize
+- Places Sidebar: Home, Desktop, Documents, Downloads, Pictures, Music, Videos, Coding Projects, Root, Trash
+- Icon Grid View & Detailed List View with seamless toggle
+- Breadcrumb / Editable Path Bar and Live Real-time Search
+- Full File Operations: Open, Open in Terminal (Kitty), Open in VS Code, Copy, Cut, Paste, Rename, Delete, Properties
+- Catppuccin Mocha Dark Theme integration
+==============================================================================
+"""
+import glob
+import json
+import mimetypes
+import os
+import shutil
+import stat
+import subprocess
+import sys
+import time
+
+import gi
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, Gdk, GdkPixbuf, GLib, Gio
+
+
+def ensure_hypr_env():
+    if not os.environ.get("HYPRLAND_INSTANCE_SIGNATURE"):
+        uid = getattr(os, "getuid", lambda: 1000)()
+        candidates = [
+            os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{uid}"),
+            f"/run/user/{uid}",
+            "/run/user/1000",
+        ]
+        for rt in candidates:
+            if not rt or not os.path.exists(rt):
+                continue
+            matches = glob.glob(f"{rt}/hypr/*/.socket.sock") + glob.glob("/tmp/hypr/*/.socket.sock")
+            if matches:
+                matches.sort(key=os.path.getmtime, reverse=True)
+                sig = os.path.basename(os.path.dirname(matches[0]))
+                os.environ["HYPRLAND_INSTANCE_SIGNATURE"] = sig
+                os.environ["XDG_RUNTIME_DIR"] = rt
+                break
+
+
+ensure_hypr_env()
+
+
+def format_size(bytes_val):
+    if bytes_val < 1024:
+        return f"{bytes_val} B"
+    elif bytes_val < 1024 * 1024:
+        return f"{bytes_val / 1024:.1f} KB"
+    elif bytes_val < 1024 * 1024 * 1024:
+        return f"{bytes_val / (1024 * 1024):.1f} MB"
+    else:
+        return f"{bytes_val / (1024 * 1024 * 1024):.2f} GB"
+
+
+FILE_CSS = b"""
+headerbar {
+    background-color: #181825;
+    border-bottom: 2px solid rgba(203, 166, 247, 0.35);
+    min-height: 44px;
+    padding: 4px 8px;
+}
+.sidebar-box {
+    background-color: #181825;
+    border-right: 1px solid rgba(69, 71, 90, 0.4);
+}
+.sidebar-row {
+    padding: 8px 12px;
+    border-radius: 8px;
+    margin: 2px 6px;
+    color: #cdd6f4;
+    font-size: 13px;
+    font-weight: 500;
+}
+.sidebar-row:hover {
+    background-color: rgba(203, 166, 247, 0.18);
+    color: #ffffff;
+}
+.sidebar-row:selected {
+    background-color: #cba6f7;
+    color: #11111b;
+    font-weight: bold;
+}
+.main-view-box {
+    background-color: #1e1e2e;
+}
+.file-item {
+    border-radius: 8px;
+    padding: 6px;
+}
+.file-item:selected {
+    background-color: rgba(203, 166, 247, 0.35);
+    border: 1px solid #cba6f7;
+}
+.status-bar-box {
+    background-color: #181825;
+    border-top: 1px solid rgba(69, 71, 90, 0.4);
+    padding: 4px 12px;
+    color: #a6adc8;
+    font-size: 12px;
+}
+button.nav-btn {
+    background-color: rgba(49, 50, 68, 0.55);
+    color: #cdd6f4;
+    border-radius: 8px;
+    padding: 4px 8px;
+    border: 1px solid rgba(203, 166, 247, 0.15);
+}
+button.nav-btn:hover {
+    background-color: rgba(203, 166, 247, 0.3);
+    border-color: #cba6f7;
+    color: #ffffff;
+}
+button.win-btn {
+    background: transparent;
+    color: #cdd6f4;
+    border-radius: 8px;
+    padding: 4px 10px;
+    margin-left: 2px;
+    border: none;
+    font-weight: bold;
+    font-size: 14px;
+}
+button.win-btn:hover {
+    background-color: rgba(69, 71, 90, 0.6);
+}
+button.win-close-btn:hover {
+    background-color: #f38ba8;
+    color: #11111b;
+}
+entry.path-entry {
+    background-color: #11111b;
+    color: #cdd6f4;
+    border: 1px solid rgba(203, 166, 247, 0.3);
+    border-radius: 8px;
+    padding: 4px 8px;
+    font-size: 12px;
+}
+entry.path-entry:focus {
+    border-color: #cba6f7;
+}
+"""
+
+
+class KryptonFileExplorer(Gtk.Window):
+    def __init__(self, initial_path=None):
+        super().__init__()
+        self.set_title("File Explorer")
+        self.set_wmclass("krypton-files", "krypton-files")
+        self.set_default_size(1080, 680)
+
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_data(FILE_CSS)
+        Gtk.StyleContext.add_provider_for_screen(
+            Gdk.Screen.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION,
+        )
+
+        user_home = os.path.expanduser("~")
+        if initial_path and os.path.isdir(initial_path):
+            self.current_dir = os.path.abspath(initial_path)
+        else:
+            self.current_dir = user_home
+
+        self.history = [self.current_dir]
+        self.history_idx = 0
+        self.show_hidden = False
+        self.view_mode = "icon"  # "icon" or "list"
+        self.clipboard = {"action": None, "files": []}
+        self.search_query = ""
+
+        self.icon_theme = Gtk.IconTheme.get_default()
+        self.setup_headerbar()
+        self.setup_ui()
+        self.refresh_folder()
+
+    def setup_headerbar(self):
+        self.header = Gtk.HeaderBar()
+        self.header.set_show_close_button(False)
+        self.update_title()
+
+        # Left controls: Back, Forward, Up, Home
+        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=3)
+
+        self.back_btn = Gtk.Button(label="◀")
+        self.back_btn.set_tooltip_text("Back (Alt+Left)")
+        self.back_btn.get_style_context().add_class("nav-btn")
+        self.back_btn.connect("clicked", self.on_go_back)
+        btn_box.pack_start(self.back_btn, False, False, 0)
+
+        self.fwd_btn = Gtk.Button(label="▶")
+        self.fwd_btn.set_tooltip_text("Forward (Alt+Right)")
+        self.fwd_btn.get_style_context().add_class("nav-btn")
+        self.fwd_btn.connect("clicked", self.on_go_forward)
+        btn_box.pack_start(self.fwd_btn, False, False, 0)
+
+        self.up_btn = Gtk.Button(label="▲")
+        self.up_btn.set_tooltip_text("Up to Parent Folder (Alt+Up)")
+        self.up_btn.get_style_context().add_class("nav-btn")
+        self.up_btn.connect("clicked", self.on_go_up)
+        btn_box.pack_start(self.up_btn, False, False, 0)
+
+        self.home_btn = Gtk.Button(label="🏠")
+        self.home_btn.set_tooltip_text("Home Folder")
+        self.home_btn.get_style_context().add_class("nav-btn")
+        self.home_btn.connect("clicked", lambda _: self.navigate_to(os.path.expanduser("~")))
+        btn_box.pack_start(self.home_btn, False, False, 0)
+
+        self.header.pack_start(btn_box)
+
+        # Path Entry
+        self.path_entry = Gtk.Entry()
+        self.path_entry.set_width_chars(32)
+        self.path_entry.get_style_context().add_class("path-entry")
+        self.path_entry.connect("activate", self.on_path_entered)
+        self.header.pack_start(self.path_entry)
+
+        # Search Entry
+        self.search_entry = Gtk.SearchEntry()
+        self.search_entry.set_placeholder_text("Search files...")
+        self.search_entry.set_width_chars(15)
+        self.search_entry.get_style_context().add_class("path-entry")
+        self.search_entry.connect("search-changed", self.on_search_changed)
+        self.header.pack_start(self.search_entry)
+
+        # View Switcher (Icon vs List)
+        self.view_btn = Gtk.Button(label="☷")
+        self.view_btn.set_tooltip_text("Toggle Grid / List View")
+        self.view_btn.get_style_context().add_class("nav-btn")
+        self.view_btn.connect("clicked", self.on_toggle_view)
+        self.header.pack_start(self.view_btn)
+
+        # New Folder
+        new_folder_btn = Gtk.Button(label="📁+")
+        new_folder_btn.set_tooltip_text("New Folder (Ctrl+Shift+N)")
+        new_folder_btn.get_style_context().add_class("nav-btn")
+        new_folder_btn.connect("clicked", self.on_create_folder)
+        self.header.pack_start(new_folder_btn)
+
+        # Open in Kitty Terminal
+        term_btn = Gtk.Button(label="")
+        term_btn.set_tooltip_text("Open Terminal Here")
+        term_btn.get_style_context().add_class("nav-btn")
+        term_btn.connect("clicked", self.on_open_terminal)
+        self.header.pack_start(term_btn)
+
+        # Open in VS Code
+        code_btn = Gtk.Button(label="󰨞")
+        code_btn.set_tooltip_text("Open in VS Code")
+        code_btn.get_style_context().add_class("nav-btn")
+        code_btn.connect("clicked", self.on_open_code)
+        self.header.pack_start(code_btn)
+
+        # Native Window Navigation Buttons [ 🗕 Minimize ] [ 🗖 Maximize ] [ ✕ Close ]
+        min_btn = Gtk.Button(label="🗕")
+        min_btn.set_tooltip_text("Minimize Window")
+        min_btn.get_style_context().add_class("win-btn")
+        min_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"]))
+
+        max_btn = Gtk.Button(label="🗖")
+        max_btn.set_tooltip_text("Maximize / Windowed")
+        max_btn.get_style_context().add_class("win-btn")
+        max_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"]))
+
+        close_btn = Gtk.Button(label="✕")
+        close_btn.set_tooltip_text("Close / Exit")
+        close_btn.get_style_context().add_class("win-btn")
+        close_btn.get_style_context().add_class("win-close-btn")
+        close_btn.connect("clicked", lambda _: self.close())
+
+        self.header.pack_end(close_btn)
+        self.header.pack_end(max_btn)
+        self.header.pack_end(min_btn)
+
+        # Enable Draggable Titlebar (Windows behavior)
+        self.header.add_events(Gdk.EventMask.BUTTON_PRESS_MASK)
+
+        def on_header_press(widget, event):
+            if event.button == 1:
+                if event.type == Gdk.EventType._2BUTTON_PRESS:
+                    subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
+                    return True
+                elif event.type == Gdk.EventType.BUTTON_PRESS:
+                    try:
+                        out = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=0.5).stdout
+                        data = json.loads(out)
+                        if data.get("fullscreen", 0) != 0:
+                            subprocess.run(["hyprctl", "dispatch", "fullscreen", "1"])
+                            subprocess.run(["hyprctl", "dispatch", "setfloating"])
+                        elif not data.get("floating", False):
+                            subprocess.run(["hyprctl", "dispatch", "setfloating"])
+                    except Exception:
+                        pass
+                    self.begin_move_drag(event.button, int(event.x_root), int(event.y_root), event.time)
+                    return True
+            return False
+
+        self.header.connect("button-press-event", on_header_press)
+        self.set_titlebar(self.header)
+
+    def update_title(self):
+        folder_name = os.path.basename(self.current_dir) or "Root"
+        self.header.props.title = f"📁 {folder_name}"
+        self.header.props.subtitle = self.current_dir
+        if hasattr(self, "path_entry"):
+            self.path_entry.set_text(self.current_dir)
+
+    def setup_ui(self):
+        vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.add(vbox)
+
+        # Paned layout (Left: Sidebar, Right: Main File View)
+        self.paned = Gtk.Paned(orientation=Gtk.Orientation.HORIZONTAL)
+        self.paned.set_position(220)
+        vbox.pack_start(self.paned, True, True, 0)
+
+        # Places Sidebar
+        sidebar_scroll = Gtk.ScrolledWindow()
+        sidebar_scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        sidebar_scroll.get_style_context().add_class("sidebar-box")
+
+        self.sidebar_list = Gtk.ListBox()
+        self.sidebar_list.set_selection_mode(Gtk.SelectionMode.SINGLE)
+        self.sidebar_list.connect("row-activated", self.on_sidebar_selected)
+        sidebar_scroll.add(self.sidebar_list)
+        self.paned.pack1(sidebar_scroll, False, False)
+
+        self.populate_sidebar()
+
+        # Main File View Container
+        self.view_container = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
+        self.view_container.get_style_context().add_class("main-view-box")
+        self.paned.pack2(self.view_container, True, False)
+
+        self.scroll = Gtk.ScrolledWindow()
+        self.scroll.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+        self.view_container.pack_start(self.scroll, True, True, 0)
+
+        # Icon View
+        # Model: [icon (GdkPixbuf), name (str), full_path (str), is_dir (bool), size_str (str), mtime_str (str)]
+        self.store = Gtk.ListStore(GdkPixbuf.Pixbuf, str, str, bool, str, str)
+
+        self.icon_view = Gtk.IconView.new_with_model(self.store)
+        self.icon_view.set_pixbuf_column(0)
+        self.icon_view.set_text_column(1)
+        self.icon_view.set_item_width(96)
+        self.icon_view.set_selection_mode(Gtk.SelectionMode.MULTIPLE)
+        self.icon_view.connect("item-activated", self.on_item_activated)
+        self.icon_view.connect("button-press-event", self.on_view_button_press)
+
+        # Tree / List View
+        self.tree_view = Gtk.TreeView(model=self.store)
+        self.tree_view.set_headers_visible(True)
+        self.tree_view.get_selection().set_mode(Gtk.SelectionMode.MULTIPLE)
+        self.tree_view.connect("row-activated", self.on_row_activated)
+        self.tree_view.connect("button-press-event", self.on_view_button_press)
+
+        # Columns for List View
+        col_icon_name = Gtk.TreeViewColumn("Name")
+        cell_icon = Gtk.CellRendererPixbuf()
+        cell_name = Gtk.CellRendererText()
+        col_icon_name.pack_start(cell_icon, False)
+        col_icon_name.pack_start(cell_name, True)
+        col_icon_name.add_attribute(cell_icon, "pixbuf", 0)
+        col_icon_name.add_attribute(cell_name, "text", 1)
+        col_icon_name.set_sort_column_id(1)
+        col_icon_name.set_min_width(260)
+        self.tree_view.append_column(col_icon_name)
+
+        col_size = Gtk.TreeViewColumn("Size", Gtk.CellRendererText(), text=4)
+        col_size.set_sort_column_id(4)
+        col_size.set_min_width(100)
+        self.tree_view.append_column(col_size)
+
+        col_mtime = Gtk.TreeViewColumn("Modified", Gtk.CellRendererText(), text=5)
+        col_mtime.set_sort_column_id(5)
+        col_mtime.set_min_width(160)
+        self.tree_view.append_column(col_mtime)
+
+        # Default to Icon View
+        self.scroll.add(self.icon_view)
+
+        # Bottom Status Bar
+        self.status_bar = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        self.status_bar.get_style_context().add_class("status-bar-box")
+        vbox.pack_end(self.status_bar, False, False, 0)
+
+        self.status_label = Gtk.Label(label="0 items", xalign=0)
+        self.status_bar.pack_start(self.status_label, True, True, 0)
+
+        self.disk_label = Gtk.Label(label="", xalign=1)
+        self.status_bar.pack_end(self.disk_label, False, False, 0)
+
+        # Keybindings
+        self.connect("key-press-event", self.on_key_press)
+
+    def populate_sidebar(self):
+        user_home = os.path.expanduser("~")
+        places = [
+            ("Home", user_home, "user-home"),
+            ("Desktop", os.path.join(user_home, "Desktop"), "user-desktop"),
+            ("Documents", os.path.join(user_home, "Documents"), "folder-documents"),
+            ("Downloads", os.path.join(user_home, "Downloads"), "folder-download"),
+            ("Pictures", os.path.join(user_home, "Pictures"), "folder-pictures"),
+            ("Music", os.path.join(user_home, "Music"), "folder-music"),
+            ("Videos", os.path.join(user_home, "Videos"), "folder-videos"),
+            ("Coding Projects", os.path.join(user_home, "Coding Projects"), "folder-development"),
+            ("Root Filesystem", "/", "drive-harddisk"),
+            ("Trash", os.path.join(user_home, ".local/share/Trash/files"), "user-trash"),
+        ]
+
+        for name, path, icon_name in places:
+            if not os.path.exists(path) and name not in ("Coding Projects", "Trash"):
+                continue
+            row = Gtk.ListBoxRow()
+            row.get_style_context().add_class("sidebar-row")
+            row.target_path = path
+
+            box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+            img = Gtk.Image.new_from_icon_name(icon_name, Gtk.IconSize.MENU)
+            lbl = Gtk.Label(label=name, xalign=0)
+            box.pack_start(img, False, False, 0)
+            box.pack_start(lbl, True, True, 0)
+
+            row.add(box)
+            self.sidebar_list.add(row)
+
+        self.sidebar_list.show_all()
+
+    def get_file_pixbuf(self, full_path, is_dir):
+        size = 48 if self.view_mode == "icon" else 20
+        if is_dir:
+            icon_name = "folder"
+            base = os.path.basename(full_path).lower()
+            if base in ("downloads", "download"):
+                icon_name = "folder-download"
+            elif base in ("documents", "doc"):
+                icon_name = "folder-documents"
+            elif base in ("pictures", "photos", "images"):
+                icon_name = "folder-pictures"
+            elif base in ("music", "audio"):
+                icon_name = "folder-music"
+            elif base in ("videos", "movies"):
+                icon_name = "folder-videos"
+            elif base in ("desktop",):
+                icon_name = "user-desktop"
+        else:
+            mime, _ = mimetypes.guess_type(full_path)
+            if mime:
+                if mime.startswith("image/"):
+                    icon_name = "image-x-generic"
+                elif mime.startswith("video/"):
+                    icon_name = "video-x-generic"
+                elif mime.startswith("audio/"):
+                    icon_name = "audio-x-generic"
+                elif mime.startswith("text/"):
+                    icon_name = "text-x-generic"
+                elif "pdf" in mime:
+                    icon_name = "application-pdf"
+                elif "zip" in mime or "tar" in mime or "compress" in mime:
+                    icon_name = "package-x-generic"
+                else:
+                    icon_name = "text-x-generic"
+            else:
+                ext = os.path.splitext(full_path)[1].lower()
+                if ext in (".py", ".sh", ".bash", ".zsh", ".js", ".ts", ".html", ".css", ".c", ".cpp", ".rs", ".go"):
+                    icon_name = "text-x-script"
+                elif ext in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"):
+                    icon_name = "image-x-generic"
+                elif ext in (".mp3", ".flac", ".wav", ".ogg"):
+                    icon_name = "audio-x-generic"
+                elif ext in (".mp4", ".mkv", ".webm", ".avi"):
+                    icon_name = "video-x-generic"
+                elif ext in (".zip", ".tar", ".gz", ".xz", ".zst", ".7z"):
+                    icon_name = "package-x-generic"
+                else:
+                    icon_name = "text-x-generic"
+
+        try:
+            return self.icon_theme.load_icon(icon_name, size, Gtk.IconLookupFlags.USE_BUILTIN)
+        except Exception:
+            try:
+                fallback = "folder" if is_dir else "text-x-generic"
+                return self.icon_theme.load_icon(fallback, size, Gtk.IconLookupFlags.USE_BUILTIN)
+            except Exception:
+                return GdkPixbuf.Pixbuf.new(GdkPixbuf.Colorspace.RGB, True, 8, size, size)
+
+    def refresh_folder(self):
+        self.store.clear()
+        self.update_title()
+
+        try:
+            entries = os.listdir(self.current_dir)
+        except Exception as e:
+            dialog = Gtk.MessageDialog(
+                transient_for=self,
+                flags=0,
+                message_type=Gtk.MessageType.ERROR,
+                buttons=Gtk.ButtonsType.OK,
+                text=f"Cannot access folder: {e}",
+            )
+            dialog.run()
+            dialog.destroy()
+            return
+
+        dirs = []
+        files = []
+
+        q = self.search_query.lower().strip()
+
+        for name in entries:
+            if not self.show_hidden and name.startswith("."):
+                continue
+            if q and q not in name.lower():
+                continue
+
+            full_p = os.path.join(self.current_dir, name)
+            is_d = os.path.isdir(full_p)
+
+            try:
+                st = os.stat(full_p)
+                sz_str = format_size(st.st_size) if not is_d else ""
+                mt_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(st.st_mtime))
+            except Exception:
+                sz_str = ""
+                mt_str = ""
+
+            if is_d:
+                dirs.append((name, full_p, True, sz_str, mt_str))
+            else:
+                files.append((name, full_p, False, sz_str, mt_str))
+
+        dirs.sort(key=lambda x: x[0].lower())
+        files.sort(key=lambda x: x[0].lower())
+
+        for name, full_p, is_d, sz_str, mt_str in dirs + files:
+            pb = self.get_file_pixbuf(full_p, is_d)
+            self.store.append([pb, name, full_p, is_d, sz_str, mt_str])
+
+        total_items = len(dirs) + len(files)
+        self.status_label.set_text(f"{total_items} items ({len(dirs)} folders, {len(files)} files)")
+
+        try:
+            du = shutil.disk_usage(self.current_dir)
+            free_str = format_size(du.free)
+            self.disk_label.set_text(f"Free: {free_str}")
+        except Exception:
+            self.disk_label.set_text("")
+
+        self.back_btn.set_sensitive(self.history_idx > 0)
+        self.fwd_btn.set_sensitive(self.history_idx < len(self.history) - 1)
+        self.up_btn.set_sensitive(os.path.dirname(self.current_dir) != self.current_dir)
+
+    def navigate_to(self, new_path):
+        if not os.path.isdir(new_path):
+            return
+        new_path = os.path.abspath(new_path)
+        if new_path == self.current_dir:
+            return
+
+        if self.history_idx < len(self.history) - 1:
+            self.history = self.history[: self.history_idx + 1]
+
+        self.history.append(new_path)
+        self.history_idx = len(self.history) - 1
+        self.current_dir = new_path
+        self.refresh_folder()
+
+    def on_go_back(self, _):
+        if self.history_idx > 0:
+            self.history_idx -= 1
+            self.current_dir = self.history[self.history_idx]
+            self.refresh_folder()
+
+    def on_go_forward(self, _):
+        if self.history_idx < len(self.history) - 1:
+            self.history_idx += 1
+            self.current_dir = self.history[self.history_idx]
+            self.refresh_folder()
+
+    def on_go_up(self, _):
+        parent = os.path.dirname(self.current_dir)
+        if parent and parent != self.current_dir:
+            self.navigate_to(parent)
+
+    def on_path_entered(self, entry):
+        p = entry.get_text().strip()
+        p = os.path.expanduser(p)
+        if os.path.isdir(p):
+            self.navigate_to(p)
+        else:
+            entry.set_text(self.current_dir)
+
+    def on_search_changed(self, entry):
+        self.search_query = entry.get_text()
+        self.refresh_folder()
+
+    def on_sidebar_selected(self, listbox, row):
+        if row and hasattr(row, "target_path"):
+            if not os.path.exists(row.target_path):
+                os.makedirs(row.target_path, exist_ok=True)
+            self.navigate_to(row.target_path)
+
+    def on_toggle_view(self, _):
+        child = self.scroll.get_child()
+        if child:
+            self.scroll.remove(child)
+
+        if self.view_mode == "icon":
+            self.view_mode = "list"
+            self.view_btn.set_label("☰")
+            self.scroll.add(self.tree_view)
+        else:
+            self.view_mode = "icon"
+            self.view_btn.set_label("☷")
+            self.scroll.add(self.icon_view)
+
+        self.scroll.show_all()
+        self.refresh_folder()
+
+    def on_item_activated(self, iconview, path):
+        itr = self.store.get_iter(path)
+        is_d = self.store.get_value(itr, 3)
+        full_p = self.store.get_value(itr, 2)
+        if is_d:
+            self.navigate_to(full_p)
+        else:
+            self.open_file(full_p)
+
+    def on_row_activated(self, treeview, path, column):
+        itr = self.store.get_iter(path)
+        is_d = self.store.get_value(itr, 3)
+        full_p = self.store.get_value(itr, 2)
+        if is_d:
+            self.navigate_to(full_p)
+        else:
+            self.open_file(full_p)
+
+    def open_file(self, full_path):
+        try:
+            subprocess.Popen(["xdg-open", full_path], env=os.environ)
+        except Exception:
+            pass
+
+    def on_open_terminal(self, _):
+        try:
+            subprocess.Popen(["kitty", "--directory", self.current_dir], env=os.environ)
+        except Exception:
+            pass
+
+    def on_open_code(self, _):
+        try:
+            subprocess.Popen(["code", "--no-sandbox", self.current_dir], env=os.environ)
+        except Exception:
+            pass
+
+    def on_create_folder(self, _):
+        dialog = Gtk.Dialog(
+            title="Create New Folder",
+            transient_for=self,
+            flags=0,
+        )
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        box = dialog.get_content_area()
+        box.set_spacing(8)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        box.set_margin_left(16)
+        box.set_margin_right(16)
+
+        entry = Gtk.Entry()
+        entry.set_text("New Folder")
+        entry.set_width_chars(25)
+        box.add(entry)
+        dialog.show_all()
+
+        if dialog.run() == Gtk.ResponseType.OK:
+            name = entry.get_text().strip()
+            if name:
+                target = os.path.join(self.current_dir, name)
+                os.makedirs(target, exist_ok=True)
+                self.refresh_folder()
+        dialog.destroy()
+
+    def get_selected_paths(self):
+        paths = []
+        if self.view_mode == "icon":
+            selected = self.icon_view.get_selected_items()
+            for p in selected:
+                itr = self.store.get_iter(p)
+                paths.append(self.store.get_value(itr, 2))
+        else:
+            model, tree_paths = self.tree_view.get_selection().get_selected_rows()
+            for p in tree_paths:
+                itr = model.get_iter(p)
+                paths.append(model.get_value(itr, 2))
+        return paths
+
+    def on_view_button_press(self, widget, event):
+        if event.button == 3:  # Right Click Context Menu
+            selected = self.get_selected_paths()
+            self.show_context_menu(event, selected)
+            return True
+        return False
+
+    def show_context_menu(self, event, selected_paths):
+        menu = Gtk.Menu()
+
+        if selected_paths:
+            # File/Folder selected
+            p = selected_paths[0]
+            is_d = os.path.isdir(p)
+
+            open_item = Gtk.MenuItem(label="Open")
+            open_item.connect("activate", lambda _: self.navigate_to(p) if is_d else self.open_file(p))
+            menu.append(open_item)
+
+            if is_d:
+                term_item = Gtk.MenuItem(label="Open in Terminal (Kitty)")
+                term_item.connect("activate", lambda _: subprocess.Popen(["kitty", "--directory", p], env=os.environ))
+                menu.append(term_item)
+
+                code_item = Gtk.MenuItem(label="Open in VS Code")
+                code_item.connect("activate", lambda _: subprocess.Popen(["code", "--no-sandbox", p], env=os.environ))
+                menu.append(code_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            copy_item = Gtk.MenuItem(label="Copy (Ctrl+C)")
+            copy_item.connect("activate", lambda _: self.set_clipboard("copy", selected_paths))
+            menu.append(copy_item)
+
+            cut_item = Gtk.MenuItem(label="Cut (Ctrl+X)")
+            cut_item.connect("activate", lambda _: self.set_clipboard("cut", selected_paths))
+            menu.append(cut_item)
+
+            rename_item = Gtk.MenuItem(label="Rename (F2)")
+            rename_item.connect("activate", lambda _: self.rename_file(p))
+            menu.append(rename_item)
+
+            del_item = Gtk.MenuItem(label="Delete (Delete)")
+            del_item.connect("activate", lambda _: self.delete_files(selected_paths))
+            menu.append(del_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            prop_item = Gtk.MenuItem(label="Properties")
+            prop_item.connect("activate", lambda _: self.show_properties(p))
+            menu.append(prop_item)
+
+        else:
+            # Empty space right-click
+            new_f_item = Gtk.MenuItem(label="New Folder (Ctrl+Shift+N)")
+            new_f_item.connect("activate", self.on_create_folder)
+            menu.append(new_f_item)
+
+            new_file_item = Gtk.MenuItem(label="New Text File")
+            new_file_item.connect("activate", self.on_create_file)
+            menu.append(new_file_item)
+
+            if self.clipboard.get("files"):
+                paste_item = Gtk.MenuItem(label=f"Paste ({len(self.clipboard['files'])} items)")
+                paste_item.connect("activate", self.on_paste)
+                menu.append(paste_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            term_item = Gtk.MenuItem(label="Open Terminal Here")
+            term_item.connect("activate", self.on_open_terminal)
+            menu.append(term_item)
+
+            code_item = Gtk.MenuItem(label="Open in VS Code")
+            code_item.connect("activate", self.on_open_code)
+            menu.append(code_item)
+
+            menu.append(Gtk.SeparatorMenuItem())
+
+            reload_item = Gtk.MenuItem(label="Reload (F5)")
+            reload_item.connect("activate", lambda _: self.refresh_folder())
+            menu.append(reload_item)
+
+        menu.show_all()
+        menu.popup_at_pointer(event)
+
+    def set_clipboard(self, action, paths):
+        self.clipboard = {"action": action, "files": paths}
+
+    def on_paste(self, _):
+        action = self.clipboard.get("action")
+        files = self.clipboard.get("files", [])
+        if not files:
+            return
+
+        for src in files:
+            if not os.path.exists(src):
+                continue
+            base = os.path.basename(src)
+            dest = os.path.join(self.current_dir, base)
+            try:
+                if action == "copy":
+                    if os.path.isdir(src):
+                        shutil.copytree(src, dest, dirs_exist_ok=True)
+                    else:
+                        shutil.copy2(src, dest)
+                elif action == "cut":
+                    shutil.move(src, dest)
+            except Exception:
+                pass
+
+        if action == "cut":
+            self.clipboard = {"action": None, "files": []}
+
+        self.refresh_folder()
+
+    def on_create_file(self, _):
+        dialog = Gtk.Dialog(title="New File", transient_for=self, flags=0)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        box = dialog.get_content_area()
+        box.set_spacing(8)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        box.set_margin_left(16)
+        box.set_margin_right(16)
+
+        entry = Gtk.Entry()
+        entry.set_text("untitled.txt")
+        entry.set_width_chars(25)
+        box.add(entry)
+        dialog.show_all()
+
+        if dialog.run() == Gtk.ResponseType.OK:
+            name = entry.get_text().strip()
+            if name:
+                target = os.path.join(self.current_dir, name)
+                with open(target, "w", encoding="utf-8") as f:
+                    f.write("")
+                self.refresh_folder()
+        dialog.destroy()
+
+    def rename_file(self, old_path):
+        old_name = os.path.basename(old_path)
+        dialog = Gtk.Dialog(title="Rename", transient_for=self, flags=0)
+        dialog.add_buttons(Gtk.STOCK_CANCEL, Gtk.ResponseType.CANCEL, Gtk.STOCK_OK, Gtk.ResponseType.OK)
+        box = dialog.get_content_area()
+        box.set_spacing(8)
+        box.set_margin_top(12)
+        box.set_margin_bottom(12)
+        box.set_margin_left(16)
+        box.set_margin_right(16)
+
+        entry = Gtk.Entry()
+        entry.set_text(old_name)
+        entry.set_width_chars(28)
+        box.add(entry)
+        dialog.show_all()
+
+        if dialog.run() == Gtk.ResponseType.OK:
+            new_name = entry.get_text().strip()
+            if new_name and new_name != old_name:
+                new_path = os.path.join(os.path.dirname(old_path), new_name)
+                try:
+                    os.rename(old_path, new_path)
+                    self.refresh_folder()
+                except Exception:
+                    pass
+        dialog.destroy()
+
+    def delete_files(self, paths):
+        for p in paths:
+            try:
+                if os.path.isdir(p):
+                    shutil.rmtree(p)
+                else:
+                    os.remove(p)
+            except Exception:
+                pass
+        self.refresh_folder()
+
+    def show_properties(self, p):
+        try:
+            st = os.stat(p)
+            is_d = os.path.isdir(p)
+            sz = format_size(st.st_size) if not is_d else "Directory"
+            mtime = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(st.st_mtime))
+            mode = oct(stat.S_IMODE(st.st_mode))
+
+            msg = f"<b>Name:</b> {os.path.basename(p)}\n<b>Location:</b> {p}\n<b>Type:</b> {'Folder' if is_d else 'File'}\n<b>Size:</b> {sz}\n<b>Modified:</b> {mtime}\n<b>Permissions:</b> {mode}"
+        except Exception as e:
+            msg = f"Error retrieving properties: {e}"
+
+        dialog = Gtk.MessageDialog(
+            transient_for=self,
+            flags=0,
+            message_type=Gtk.MessageType.INFO,
+            buttons=Gtk.ButtonsType.OK,
+            text="File Properties",
+        )
+        dialog.format_secondary_markup(msg)
+        dialog.run()
+        dialog.destroy()
+
+    def on_key_press(self, widget, event):
+        ctrl = bool(event.state & Gdk.ModifierType.CONTROL_MASK)
+        alt = bool(event.state & Gdk.ModifierType.MOD1_MASK)
+        shift = bool(event.state & Gdk.ModifierType.SHIFT_MASK)
+        key = Gdk.keyval_name(event.keyval)
+
+        if ctrl and key in ("h", "H"):
+            self.show_hidden = not self.show_hidden
+            self.refresh_folder()
+            return True
+        elif ctrl and key in ("c", "C"):
+            selected = self.get_selected_paths()
+            if selected:
+                self.set_clipboard("copy", selected)
+            return True
+        elif ctrl and key in ("x", "X"):
+            selected = self.get_selected_paths()
+            if selected:
+                self.set_clipboard("cut", selected)
+            return True
+        elif ctrl and key in ("v", "V"):
+            self.on_paste(None)
+            return True
+        elif ctrl and shift and key in ("n", "N"):
+            self.on_create_folder(None)
+            return True
+        elif key == "F5":
+            self.refresh_folder()
+            return True
+        elif key == "F2":
+            selected = self.get_selected_paths()
+            if selected:
+                self.rename_file(selected[0])
+            return True
+        elif key == "Delete":
+            selected = self.get_selected_paths()
+            if selected:
+                self.delete_files(selected)
+            return True
+        elif alt and key == "Left":
+            self.on_go_back(None)
+            return True
+        elif alt and key == "Right":
+            self.on_go_forward(None)
+            return True
+        elif alt and key == "Up":
+            self.on_go_up(None)
+            return True
+        elif ctrl and key in ("l", "L"):
+            self.path_entry.grab_focus()
+            return True
+        elif ctrl and key in ("f", "F"):
+            self.search_entry.grab_focus()
+            return True
+        return False
+
+
+def main():
+    target_path = None
+    args = sys.argv[1:]
+    # If Thunar-specific flags like --daemon or -q are passed, handle them gracefully
+    if "--daemon" in args:
+        # Keep process alive or exit
+        sys.exit(0)
+    for arg in args:
+        if not arg.startswith("-"):
+            if os.path.exists(arg):
+                target_path = os.path.abspath(arg)
+                break
+
+    app = KryptonFileExplorer(initial_path=target_path)
+    app.connect("destroy", Gtk.main_quit)
+    app.show_all()
+    Gtk.main()
+
+
+if __name__ == "__main__":
+    main()

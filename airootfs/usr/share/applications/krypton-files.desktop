@@ -1,0 +1,12 @@
+[Desktop Entry]
+Name=Files
+GenericName=File Explorer
+Comment=Browse, manage, and organize files and folders with native window navigation controls
+Exec=/usr/local/bin/krypton-files %U
+Icon=thunar
+Terminal=false
+Type=Application
+Categories=System;Utility;Core;GTK;FileTools;FileManager;
+Keywords=files;folders;explorer;manager;thunar;disk;
+StartupNotify=true
+MimeType=inode/directory;

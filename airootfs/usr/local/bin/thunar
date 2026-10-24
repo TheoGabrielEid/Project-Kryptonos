@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# KryptonOS File Explorer Wrapper
+# Launches the native Krypton File Explorer with integrated titlebar & window buttons
+# ==============================================================================
+for arg in "$@"; do
+    if [ "$arg" = "-q" ] || [ "$arg" = "--quit" ]; then
+        pkill -f krypton-files 2>/dev/null || true
+        [ -x /usr/bin/thunar-bin ] && /usr/bin/thunar-bin -q 2>/dev/null || true
+        exit 0
+    elif [ "$arg" = "--daemon" ]; then
+        exit 0
+    elif [ "$arg" = "-v" ] || [ "$arg" = "--version" ]; then
+        echo "KryptonOS File Explorer 1.0 (with Native Navigation Bar)"
+        exit 0
+    fi
+done
+
+exec /usr/local/bin/krypton-files "$@"
