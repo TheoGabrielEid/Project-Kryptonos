@@ -65,21 +65,13 @@ set_window_mode() {
 # ==============================================================================
 # KryptonOS Window Mode: Windows Style (Floating & Resizable)
 # ==============================================================================
-windowrule = match:class ^(.*)$, float true
-windowrule = match:class ^(kitty)$, size 68% 62%
-windowrule = match:class ^(kitty)$, center true
+windowrule = match:class .*, float true
 
 general {
     layout = dwindle
     resize_on_border = true
     extend_border_grab_area = 15
     hover_icon_on_border = true
-}
-
-dwindle {
-    preserve_split = true
-    smart_split = false
-    smart_resizing = true
 }
 EOF
         cp -f "$MODE_CONF" /etc/skel/.config/hypr/window_mode.conf 2>/dev/null || true
@@ -134,7 +126,7 @@ EOF
 
         # Tile all open regular app windows
         if command -v jq >/dev/null 2>&1; then
-            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "pavucontrol" and .class != "blueman-manager" and .class != "org.gnome.Calculator" and .class != "krypton-settings" and .class != "krypton-themes" and .class != "file-roller" and .class != "scratchpad" and .class != "kproj" and .class != "kitty") | .address // empty'); do
+            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "pavucontrol" and .class != "blueman-manager" and .class != "org.gnome.Calculator" and .class != "krypton-settings" and .class != "krypton-themes" and .class != "file-roller" and .class != "scratchpad" and .class != "kproj") | .address // empty'); do
                 hyprctl dispatch settiled "address:${addr}" >/dev/null 2>&1 || true
             done
         fi
@@ -171,7 +163,13 @@ case "$ACTION" in
         hyprctl dispatch movetoworkspacesilent special:minimized
         ;;
     restore)
-        hyprctl dispatch togglespecialworkspace minimized
+        TARGET_ADDR=$(format_addr "${ARG:-}")
+        if [ -n "$TARGET_ADDR" ]; then
+            hyprctl dispatch movetoworkspace "+0,${TARGET_ADDR}"
+            hyprctl dispatch focuswindow "${TARGET_ADDR}"
+        else
+            hyprctl dispatch togglespecialworkspace minimized
+        fi
         ;;
     toggle-float)
         TARGET_ADDR=$(format_addr "${ARG:-}")

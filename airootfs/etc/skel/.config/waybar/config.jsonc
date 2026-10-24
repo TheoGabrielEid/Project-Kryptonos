@@ -9,7 +9,10 @@
     "modules-left": [
         "custom/launcher",
         "hyprland/workspaces",
-        "hyprland/window"
+        "hyprland/window",
+        "custom/win_min",
+        "custom/win_max",
+        "custom/win_close"
     ],
     "modules-center": [
         "clock"
@@ -50,6 +53,21 @@
         "format": "{title}",
         "max-length": 45,
         "separate-outputs": true
+    },
+    "custom/win_min": {
+        "format": "🗕",
+        "tooltip-format": "Minimize Focused Window",
+        "on-click": "/usr/local/bin/krypton-win-ctl minimize"
+    },
+    "custom/win_max": {
+        "format": "🗖",
+        "tooltip-format": "Maximize / Restore Focused Window",
+        "on-click": "/usr/local/bin/krypton-win-ctl maximize"
+    },
+    "custom/win_close": {
+        "format": "✕",
+        "tooltip-format": "Close Focused Window",
+        "on-click": "/usr/local/bin/krypton-win-ctl close"
     },
     "clock": {
         "format": "󰥔  {:%H:%M  󰃭 %a %d %b}",

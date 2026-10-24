@@ -1,81 +1,63 @@
-# ==============================================================================
-# KryptonOS Kitty Custom Navigation Bar
-# Features:
-#   - Terminal Icon & Tab Management
-#   - Interactive Window Navigation Buttons:
-#       [ 🗕 ] Minimize  (Super+I / Special Workspace)
-#       [ 🗖 ] Maximize  (Super+F / Fullscreen 1)
-#       [ ✕ ] Close     (Super+Q / Alt+F4)
-#   - Double-click to toggle maximize / restore
-# ==============================================================================
-import os
+"""
+KryptonOS Kitty Custom Tab Bar & Navigation Header
+Renders active tab and title on the left and navigation buttons (🗕, 🗖, ✕) on the right.
+Clicking the buttons triggers system window management via krypton-win-ctl and Kitty boss.
+"""
 import subprocess
-from kitty.fast_data_types import Screen
-from kitty.tab_bar import (
-    DrawData,
-    ExtraData,
-    TabBarData,
-    as_rgb,
-    draw_title,
-)
+from kitty.fast_data_types import Screen, get_boss
+from kitty.tab_bar import DrawData, ExtraData, TabBarData
 
-def _setup_hooks():
-    try:
-        from kitty.boss import Boss
-        if not getattr(Boss, "_krypton_nav_patched", False):
-            orig_activate = getattr(Boss, "activate_tab_at", None)
-            if orig_activate:
-                def patched_activate_tab_at(self, os_window_id, x, is_double=False, *args, **kwargs):
-                    try:
-                        w = self.os_window_map.get(os_window_id)
-                        cols = w.screen.columns if w and hasattr(w, "screen") else 80
-                        if cols - 5 <= x <= cols:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "close"])
-                            return
-                        elif cols - 10 <= x < cols - 5:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
-                            return
-                        elif cols - 15 <= x < cols - 10:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"])
-                            return
-                        elif is_double:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
-                            return
-                    except Exception:
-                        pass
-                    return orig_activate(self, os_window_id, x, is_double, *args, **kwargs)
+_patched = False
+_last_cols = 80
+_last_cell_w = 10.0
 
-                Boss.activate_tab_at = patched_activate_tab_at
-                Boss._krypton_nav_patched = True
-    except Exception:
-        pass
+
+def _ensure_patch():
+    global _patched
+    if _patched:
+        return
+    _patched = True
 
     try:
         from kitty.tabs import TabManager
-        if not getattr(TabManager, "_krypton_nav_patched", False):
-            orig_tm_activate = getattr(TabManager, "activate_tab_at", None)
-            if orig_tm_activate:
-                def patched_tm_activate(self, x, is_double=False, *args, **kwargs):
-                    try:
-                        cols = getattr(self, "screen_columns", 80)
-                        if cols - 5 <= x <= cols:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "close"])
-                            return
-                        elif cols - 10 <= x < cols - 5:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
-                            return
-                        elif cols - 15 <= x < cols - 10:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"])
-                            return
-                        elif is_double:
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
-                            return
-                    except Exception:
-                        pass
-                    return orig_tm_activate(self, x, is_double, *args, **kwargs)
 
-                TabManager.activate_tab_at = patched_tm_activate
-                TabManager._krypton_nav_patched = True
+        orig_activate_tab_at = TabManager.activate_tab_at
+
+        def _krypton_activate_tab_at(self, *args, **kwargs):
+            try:
+                x = float(args[0]) if args else 0.0
+                cw = _last_cell_w
+                if hasattr(self, "tab_bar") and getattr(self.tab_bar, "cell_width", 0):
+                    cw = float(self.tab_bar.cell_width)
+                cols = _last_cols
+                if hasattr(self, "tab_bar") and hasattr(self.tab_bar, "screen") and getattr(self.tab_bar.screen, "columns", 0):
+                    cols = int(self.tab_bar.screen.columns)
+
+                col = int(x / max(1.0, cw))
+
+                # Navigation buttons occupy the last 14 columns
+                # [🗕] cols-14 to cols-10 | [🗖] cols-9 to cols-5 | [✕] cols-4 to cols
+                if col >= cols - 14:
+                    if col >= cols - 4:
+                        # Close (✕)
+                        try:
+                            get_boss().close_os_window(self.os_window_id)
+                        except Exception:
+                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "close"])
+                    elif col >= cols - 9:
+                        # Maximize / Fullscreen (🗖)
+                        subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"])
+                    else:
+                        # Minimize (🗕)
+                        subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"])
+                    return
+            except Exception:
+                pass
+
+            return orig_activate_tab_at(self, *args, **kwargs)
+
+        TabManager.activate_tab_at = _krypton_activate_tab_at
+
     except Exception:
         pass
 
@@ -90,58 +72,26 @@ def draw_tab(
     is_last: bool,
     extra_data: ExtraData,
 ) -> int:
-    _setup_hooks()
+    global _last_cols, _last_cell_w
+    _ensure_patch()
+    _last_cols = screen.columns
+    try:
+        _last_cell_w = float(getattr(draw_data, "cell_width", 10.0) or 10.0)
+    except Exception:
+        pass
 
-    # Draw left prefix icon on first tab
-    if index == 1:
-        screen.cursor.bg = as_rgb(0x181825)
-        screen.cursor.fg = as_rgb(0xcba6f7)
-        screen.cursor.bold = True
-        screen.draw(" 󰞷 ")
-        screen.cursor.bold = False
+    title = tab.title if tab.title else f"Terminal {index}"
+    if len(title) > 30:
+        title = title[:27] + "..."
+    marker = "● " if tab.is_active else "○ "
+    screen.draw(f" {marker}{title} ")
+    end = screen.cursor.x
 
-    # Draw the active or inactive tab
-    if tab.is_active:
-        screen.cursor.bg = as_rgb(0xcba6f7)
-        screen.cursor.fg = as_rgb(0x11111b)
-        screen.cursor.bold = True
-    else:
-        screen.cursor.bg = as_rgb(0x313244)
-        screen.cursor.fg = as_rgb(0xcdd6f4)
-        screen.cursor.bold = False
-
-    tab_text = tab.title or "terminal"
-    if len(tab_text) > 24:
-        tab_text = tab_text[:22] + "…"
-    screen.draw(f" {tab_text} ")
-    screen.cursor.bold = False
-
-    # Draw the rightmost navigation control buttons when on the last tab
     if is_last:
-        cur_x = screen.cursor.x
-        total_cols = screen.columns
-        nav_width = 15
-        rem_spaces = max(0, total_cols - cur_x - nav_width)
+        btns = " 🗕   🗖   ✕ "
+        pad = screen.columns - screen.cursor.x - len(btns)
+        if pad > 0:
+            screen.draw(" " * pad)
+        screen.draw(btns)
 
-        # Fill background up to the buttons
-        screen.cursor.bg = as_rgb(0x181825)
-        screen.cursor.fg = as_rgb(0x6c7086)
-        if rem_spaces > 0:
-            screen.draw(" " * rem_spaces)
-
-        # Draw Minimize button (yellowish)
-        screen.cursor.bg = as_rgb(0x181825)
-        screen.cursor.fg = as_rgb(0xf9e2af)
-        screen.cursor.bold = True
-        screen.draw(" 🗕  ")
-
-        # Draw Maximize button (greenish)
-        screen.cursor.fg = as_rgb(0xa6e3a1)
-        screen.draw(" 🗖  ")
-
-        # Draw Close button (reddish)
-        screen.cursor.fg = as_rgb(0xf38ba8)
-        screen.draw(" ✕ ")
-        screen.cursor.bold = False
-
-    return screen.cursor.x
+    return end

@@ -173,6 +173,47 @@ window#waybar {
     color: #11111b;
 }
 
+#custom-win_min,
+#custom-win_max,
+#custom-win_close {
+    background-color: @theme_bg;
+    padding: 3px 9px;
+    border-radius: 8px;
+    border: 1px solid @theme_border;
+    margin-top: 4px;
+    margin-bottom: 4px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+#custom-win_min {
+    color: #f9e2af;
+    margin-left: 6px;
+}
+#custom-win_min:hover {
+    background-color: #f9e2af;
+    color: #11111b;
+}
+
+#custom-win_max {
+    color: #a6e3a1;
+    margin-left: 2px;
+}
+#custom-win_max:hover {
+    background-color: #a6e3a1;
+    color: #11111b;
+}
+
+#custom-win_close {
+    color: #f38ba8;
+    margin-left: 2px;
+    margin-right: 6px;
+}
+#custom-win_close:hover {
+    background-color: #f38ba8;
+    color: #11111b;
+}
+
 tooltip {
     background-color: @theme_card;
     border: 1px solid @theme_border;

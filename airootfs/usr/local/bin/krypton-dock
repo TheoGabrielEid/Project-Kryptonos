@@ -136,22 +136,6 @@ window {
 .dock-start-btn:hover {
     background: linear-gradient(135deg, #b4befe, #89dceb);
 }
-.dock-mode-btn {
-    background-color: rgba(49, 50, 68, 0.75);
-    color: #cba6f7;
-    font-family: "JetBrainsMono Nerd Font", monospace;
-    font-size: 11px;
-    font-weight: bold;
-    border-radius: 14px;
-    padding: 2px 12px;
-    min-height: 44px;
-    border: 1px solid rgba(203, 166, 247, 0.35);
-}
-.dock-mode-btn:hover {
-    background-color: rgba(203, 166, 247, 0.35);
-    color: #ffffff;
-    border: 1px solid rgba(203, 166, 247, 0.7);
-}
 .sep-line {
     background-color: rgba(203, 166, 247, 0.3);
     min-width: 2px;
@@ -525,11 +509,6 @@ class KryptonDock(Gtk.Window):
             s_item.connect("activate", lambda _: subprocess.Popen("/usr/local/bin/krypton-settings", shell=True))
             menu.append(s_item)
 
-            mode_label = "🪟 Switch to Windows Style (Floating)" if self.get_current_mode() == "hyprland" else "⚡ Switch to Hyprland Tiling (Grid)"
-            wm_item = Gtk.MenuItem(label=mode_label)
-            wm_item.connect("activate", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "toggle-mode"]))
-            menu.append(wm_item)
-
             menu.append(Gtk.SeparatorMenuItem())
 
             pin_sub = Gtk.MenuItem(label="📌 Pin Apps to Taskbar...")
@@ -572,14 +551,6 @@ class KryptonDock(Gtk.Window):
                 if len(matching_wins) == 1:
                     w = matching_wins[0]
                     addr = w.get("address", "")
-                    min_item = Gtk.MenuItem(label=f"🗕 Minimize {pin['name']}")
-                    min_item.connect("activate", lambda _, a=addr: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize", a]))
-                    menu.append(min_item)
-
-                    max_item = Gtk.MenuItem(label=f"🗖 Maximize {pin['name']}")
-                    max_item.connect("activate", lambda _, a=addr: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize", a]))
-                    menu.append(max_item)
-
                     exit_item = Gtk.MenuItem(label=f"✕ Exit {pin['name']}")
                     exit_item.connect("activate", lambda _, a=addr: self.close_window(a))
                     menu.append(exit_item)
@@ -615,19 +586,14 @@ class KryptonDock(Gtk.Window):
             menu.popup_at_pointer(event)
             return True
 
-        # Left click -> Focus window, or Minimize if already focused
+        # Left click -> Focus window or launch
         if matching_wins:
             addr = matching_wins[0].get("address", "")
+            ws = matching_wins[0].get("workspace", {})
+            ws_name = ws.get("name", "") if isinstance(ws, dict) else ""
+            if "special:minimized" in ws_name or ws_name == "special:minimized":
+                subprocess.Popen(["hyprctl", "dispatch", "movetoworkspace", f"+0,address:{addr}"])
             if addr:
-                try:
-                    res = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=1)
-                    if res.returncode == 0 and res.stdout.strip():
-                        act_addr = json.loads(res.stdout).get("address", "")
-                        if act_addr and (act_addr == addr or f"0x{act_addr}" == addr or act_addr == f"0x{addr}"):
-                            subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize", addr])
-                            return True
-                except Exception:
-                    pass
                 subprocess.Popen(["hyprctl", "dispatch", "focuswindow", f"address:{addr}"])
         else:
             subprocess.Popen(pin["cmd"], shell=True)
@@ -638,16 +604,8 @@ class KryptonDock(Gtk.Window):
         wclass = client.get("class", "app")
         short_name = wclass.split(".")[-1][:14].capitalize()
 
-        if event.button == 3:  # Right-click -> Window Controls / Pin
+        if event.button == 3:  # Right-click -> Close / Pin
             menu = Gtk.Menu()
-
-            min_item = Gtk.MenuItem(label=f"🗕 Minimize {short_name}")
-            min_item.connect("activate", lambda _, a=addr: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize", a]))
-            menu.append(min_item)
-
-            max_item = Gtk.MenuItem(label=f"🗖 Maximize {short_name}")
-            max_item.connect("activate", lambda _, a=addr: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize", a]))
-            menu.append(max_item)
 
             exit_item = Gtk.MenuItem(label=f"✕ Exit {short_name}")
             exit_item.connect("activate", lambda _, a=addr: self.close_window(a))
@@ -674,17 +632,12 @@ class KryptonDock(Gtk.Window):
             menu.popup_at_pointer(event)
             return True
 
-        # Left click -> Focus, or Minimize if already focused
+        # Left click -> Focus (and restore if minimized)
         if addr:
-            try:
-                res = subprocess.run(["hyprctl", "activewindow", "-j"], capture_output=True, text=True, timeout=1)
-                if res.returncode == 0 and res.stdout.strip():
-                    act_addr = json.loads(res.stdout).get("address", "")
-                    if act_addr and (act_addr == addr or f"0x{act_addr}" == addr or act_addr == f"0x{addr}"):
-                        subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize", addr])
-                        return True
-            except Exception:
-                pass
+            ws = client.get("workspace", {})
+            ws_name = ws.get("name", "") if isinstance(ws, dict) else ""
+            if "special:minimized" in ws_name or ws_name == "special:minimized":
+                subprocess.Popen(["hyprctl", "dispatch", "movetoworkspace", f"+0,address:{addr}"])
             subprocess.Popen(["hyprctl", "dispatch", "focuswindow", f"address:{addr}"])
         return True
 
