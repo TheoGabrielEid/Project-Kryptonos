@@ -95,14 +95,7 @@ def show_install_dialog(exe_path):
 def install_wine_and_run(exe_path=None):
     """Installs Wine package and then runs the target executable."""
     notify("Installing Wine Support", "Configuring Windows compatibility subsystem...", icon="software-properties")
-    # Check if local cache has packages
-    pkg_cache = Path("/var/cache/pacman/pkg")
-    wine_pkgs = list(pkg_cache.glob("wine*.pkg.tar.zst"))
-    if wine_pkgs:
-        cmd = "sudo pacman -U --noconfirm /var/cache/pacman/pkg/wine*.pkg.tar.zst"
-    else:
-        cmd = "sudo pacman -Sy --noconfirm wine winetricks"
-    
+    cmd = "sudo /usr/local/bin/krypton-wine-init"
     if exe_path:
         cmd += f" && krypton-exe-runner '{exe_path}'"
     subprocess.Popen(["kitty", "--title", "KryptonOS - Installing Wine Support", "bash", "-c", f"{cmd}; echo 'Installation complete. Press enter to exit'; read"])

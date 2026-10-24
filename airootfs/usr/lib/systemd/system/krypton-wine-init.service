@@ -1,0 +1,13 @@
+[Unit]
+Description=KryptonOS Wine WoW64 Windows Executable Subsystem Setup
+DefaultDependencies=no
+After=local-fs.target
+Before=sysinit.target display-manager.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/krypton-wine-init
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+<action>
+	<icon>wine</icon>
+	<name>Run with Wine</name>
+	<submenu></submenu>
+	<unique-id>1700000000000001-1</unique-id>
+	<command>/usr/local/bin/krypton-exe-runner %f</command>
+	<description>Execute Windows application with Wine</description>
+	<range></range>
+	<patterns>*.exe;*.EXE;*.msi;*.MSI;*.bat;*.BAT;*.cmd;*.CMD</patterns>
+	<other-files/>
+</action>
+<action>
+	<icon>utilities-terminal</icon>
+	<name>Open Terminal Here</name>
+	<submenu></submenu>
+	<unique-id>1700000000000002-2</unique-id>
+	<command>kitty --directory %f</command>
+	<description>Open terminal in current directory</description>
+	<range></range>
+	<patterns>*</patterns>
+	<directories/>
+</action>
+<action>
+	<icon>com.visualstudio.code</icon>
+	<name>Open in VS Code</name>
+	<submenu></submenu>
+	<unique-id>1700000000000003-3</unique-id>
+	<command>code --no-sandbox %f</command>
+	<description>Open folder or file in Visual Studio Code</description>
+	<range></range>
+	<patterns>*</patterns>
+	<directories/>
+	<text-files/>
+</action>
+<action>
+	<icon>preferences-system</icon>
+	<name>Configure Wine (winecfg)</name>
+	<submenu></submenu>
+	<unique-id>1700000000000004-4</unique-id>
+	<command>/usr/local/bin/krypton-exe-runner config</command>
+	<description>Open Wine configuration panel</description>
+	<range></range>
+	<patterns>*.exe;*.EXE;*.msi;*.MSI</patterns>
+	<other-files/>
+</action>
+</actions>

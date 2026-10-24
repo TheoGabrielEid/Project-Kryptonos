@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# KryptonOS Wine WoW64 Installation & Environment Initializer
+# Ensures Wine, binfmt_misc, and MIME associations are active on boot
+# ==============================================================================
+
+# 1. Check if wine binary is installed
+if [ ! -x /usr/bin/wine ] && [ ! -x /usr/bin/wine64 ]; then
+    echo ":: KryptonOS Wine Initializer: Wine not found in /usr/bin, checking archive..."
+    if [ -f "/run/archiso/bootmnt/krypton-wine.tar" ]; then
+        echo "   -> Extracting /run/archiso/bootmnt/krypton-wine.tar..."
+        tar -xf "/run/archiso/bootmnt/krypton-wine.tar" -C / 2>/dev/null || true
+    fi
+    PKG_CACHE="/var/cache/pacman/pkg"
+    if [ ! -x /usr/bin/wine ] && [ -d "/run/archiso/bootmnt/packages" ]; then
+        mkdir -p "${PKG_CACHE}"
+        cp -f /run/archiso/bootmnt/packages/*.pkg.tar.zst "${PKG_CACHE}/" 2>/dev/null || true
+    fi
+    if [ ! -x /usr/bin/wine ] && compgen -G "${PKG_CACHE}/*.pkg.tar.zst" > /dev/null; then
+        echo ":: Unpacking bundled Windows compatibility packages..."
+        for pkg in "${PKG_CACHE}"/*.pkg.tar.zst; do
+            echo "   -> Extracting $(basename "$pkg")..."
+            tar -xf "$pkg" -C / --exclude=".PKGINFO" --exclude=".BUILDINFO" --exclude=".MTREE" --exclude=".INSTALL" 2>/dev/null || true
+        done
+    fi
+    ldconfig 2>/dev/null || true
+    chmod +x /usr/bin/wine* /usr/bin/msi* /usr/bin/zstd* 2>/dev/null || true
+fi
+
+# Ensure wine symlinks exist in /usr/local/bin
+mkdir -p /usr/local/bin
+[ -x /usr/bin/wine ] && ln -sf /usr/bin/wine /usr/local/bin/wine
+[ -x /usr/bin/wineserver ] && ln -sf /usr/bin/wineserver /usr/local/bin/wineserver
+[ -x /usr/bin/winecfg ] && ln -sf /usr/bin/winecfg /usr/local/bin/winecfg
+
+# 2. Ensure binfmt_misc is loaded so Linux kernel runs .exe natively
+modprobe binfmt_misc 2>/dev/null || true
+systemctl restart systemd-binfmt.service 2>/dev/null || true
+
+# 3. Update desktop and MIME databases
+update-desktop-database /usr/share/applications 2>/dev/null || true
+update-mime-database /usr/share/mime 2>/dev/null || true
+
+echo ":: KryptonOS Wine Initializer: Windows executable subsystem ready."
+exit 0
