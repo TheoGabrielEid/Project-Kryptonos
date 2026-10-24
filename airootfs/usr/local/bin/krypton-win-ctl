@@ -124,9 +124,9 @@ EOF
             pkill -USR1 -f krypton-window-mode-daemon 2>/dev/null || true
         fi
 
-        # Tile all open regular app windows (keep terminal and utilities windowed)
+        # Tile all open regular app and system app windows
         if command -v jq >/dev/null 2>&1; then
-            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "kitty" and .class != "nvim" and .class != "btop" and .class != "pavucontrol" and .class != "blueman-manager" and .class != "org.gnome.Calculator" and .class != "krypton-settings" and .class != "krypton-themes" and .class != "file-roller" and .class != "scratchpad" and .class != "kproj") | .address // empty'); do
+            for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[] | select(.class != "polkit-gnome-authentication-agent-1" and .class != "scratchpad") | .address // empty'); do
                 hyprctl dispatch settiled "address:${addr}" >/dev/null 2>&1 || true
             done
         fi

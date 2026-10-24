@@ -577,7 +577,7 @@ class ThemeManagerWindow(Gtk.Window):
 
     def setup_header(self):
         header = Gtk.HeaderBar()
-        header.set_show_close_button(False)
+        header.set_show_close_button(True)
         header.props.title = "Krypton Theme Studio"
         header.props.subtitle = "Themes, Wallpapers & Desktop Customizer"
 
@@ -588,25 +588,6 @@ class ThemeManagerWindow(Gtk.Window):
         apply_btn.get_style_context().add_class("suggested-action")
         apply_btn.connect("clicked", self.on_apply_clicked)
         header.pack_start(apply_btn)
-
-        close_btn = Gtk.Button(label="✕")
-        close_btn.set_tooltip_text("Close Theme Studio")
-        close_btn.get_style_context().add_class("action-btn")
-        close_btn.connect("clicked", lambda _: self.close())
-
-        max_btn = Gtk.Button(label="🗖")
-        max_btn.set_tooltip_text("Maximize / Fullscreen")
-        max_btn.get_style_context().add_class("action-btn")
-        max_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"]))
-
-        min_btn = Gtk.Button(label="🗕")
-        min_btn.set_tooltip_text("Minimize Window")
-        min_btn.get_style_context().add_class("action-btn")
-        min_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"]))
-
-        header.pack_end(close_btn)
-        header.pack_end(max_btn)
-        header.pack_end(min_btn)
 
         self.set_titlebar(header)
 

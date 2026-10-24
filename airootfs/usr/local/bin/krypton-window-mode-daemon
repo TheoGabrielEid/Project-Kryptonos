@@ -16,22 +16,9 @@ import time
 
 MODE_FILE = os.path.expanduser("~/.config/hypr/.window_mode")
 
-ALWAYS_FLOAT_CLASSES = {
-    "kitty",
-    "nvim",
-    "btop",
-    "pavucontrol",
-    "blueman-manager",
-    "nm-connection-editor",
-    "org.gnome.Calculator",
-    "file-roller",
-    "krypton-settings",
-    "krypton-themes",
-    "KryptonSettings",
-    "org.kryptonos.Settings",
+MODAL_DIALOG_CLASSES = {
+    "polkit-gnome-authentication-agent-1",
     "scratchpad",
-    "kproj",
-    "lazygit",
 }
 
 
@@ -108,7 +95,7 @@ def enforce_all_windows():
                     addr = f"0x{addr}"
                 if mode == "windows":
                     hctl_dispatch("setfloating", f"address:{addr}")
-                elif mode == "hyprland" and wclass not in ALWAYS_FLOAT_CLASSES:
+                elif mode == "hyprland" and wclass not in MODAL_DIALOG_CLASSES:
                     hctl_dispatch("settiled", f"address:{addr}")
     except Exception:
         pass
@@ -124,7 +111,7 @@ def enforce_window(addr, wclass=""):
         hctl_dispatch("setfloating", f"address:{addr}")
         time.sleep(0.04)
         hctl_dispatch("setfloating", f"address:{addr}")
-    elif mode == "hyprland" and wclass not in ALWAYS_FLOAT_CLASSES:
+    elif mode == "hyprland" and wclass not in MODAL_DIALOG_CLASSES:
         hctl_dispatch("settiled", f"address:{addr}")
 
 

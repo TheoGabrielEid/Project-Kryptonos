@@ -242,33 +242,14 @@ class KryptonSettingsWindow(Gtk.Window):
         self.monitors = get_monitors()
         self.active_monitor = self.monitors[0].get("name", "Virtual-1")
 
-        # HeaderBar + StackSwitcher (with explicit Minimize, Maximize/Fullscreen, and Close buttons)
+        # HeaderBar + StackSwitcher (Native System Minimize, Maximize/Fullscreen, and Close buttons)
         header = Gtk.HeaderBar()
-        header.set_show_close_button(False)
+        header.set_show_close_button(True)
         self.stack = Gtk.Stack()
         self.stack.set_transition_type(Gtk.StackTransitionType.SLIDE_LEFT_RIGHT)
         switcher = Gtk.StackSwitcher()
         switcher.set_stack(self.stack)
         header.set_custom_title(switcher)
-
-        close_btn = Gtk.Button(label="✕")
-        close_btn.set_tooltip_text("Close / Exit Settings")
-        close_btn.get_style_context().add_class("action-btn")
-        close_btn.connect("clicked", lambda _: self.close())
-
-        max_btn = Gtk.Button(label="🗖")
-        max_btn.set_tooltip_text("Maximize / Fullscreen")
-        max_btn.get_style_context().add_class("action-btn")
-        max_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "maximize"]))
-
-        min_btn = Gtk.Button(label="🗕")
-        min_btn.set_tooltip_text("Minimize Window")
-        min_btn.get_style_context().add_class("action-btn")
-        min_btn.connect("clicked", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "minimize"]))
-
-        header.pack_end(close_btn)
-        header.pack_end(max_btn)
-        header.pack_end(min_btn)
         self.set_titlebar(header)
 
         main_vbox = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
