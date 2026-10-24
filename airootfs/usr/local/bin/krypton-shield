@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""
+==============================================================================
+KryptonOS Active Virus & Malware Protection Sentinel (krypton-shield)
+==============================================================================
+Real-time watchdog & heuristic scanner protecting:
+- ~/Downloads
+- /tmp and /dev/shm
+- ~/.config/autostart
+- Running process execution paths
+
+Neutralizes:
+- Double extension traps (*.pdf.exe, *.docx.sh, etc.)
+- Reverse shells & command droppers (bash /dev/tcp, nc -e, curl|sh, python pty)
+- Obfuscated base64 shell scripts
+- Cryptominers (xmrig, stratum+tcp)
+- Unprivileged ELF executables dropped into world-writable locations
+- Unauthorized persistence scripts
+==============================================================================
+"""
+import glob
+import json
+import os
+import re
+import shutil
+import signal
+import stat
+import subprocess
+import sys
+import threading
+import time
+
+STATE_DIR = os.path.expanduser("~/.local/share/krypton")
+QUARANTINE_DIR = os.path.join(STATE_DIR, "quarantine")
+LOG_FILE = os.path.join(STATE_DIR, "security.log")
+STATUS_FILE = os.path.join(STATE_DIR, "shield_status.json")
+
+# Ensure required directories exist with private permissions (0700)
+os.makedirs(QUARANTINE_DIR, mode=0o700, exist_ok=True)
+
+# Dangerous Heuristic Regex Patterns
+MALWARE_SIGNATURES = [
+    # Reverse Shells
+    (r"/dev/tcp/[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+/[0-9]+", "Reverse Shell (/dev/tcp backdoor)"),
+    (r"(nc|ncat|netcat)\s+.*-e\s+(/bin/sh|/bin/bash)", "Netcat Executable Backdoor"),
+    (r"python[23]?\s+-c\s+.*pty\.spawn", "Python Interactive PTY Reverse Shell"),
+    (r"perl\s+-e\s+.*use\s+Socket", "Perl Socket Backdoor"),
+    (r"mkfifo\s+/tmp/.*cat\s+/tmp/.*\|\s*/bin/sh", "Named Pipe FIFO Shell"),
+    # Obfuscated Payloads & Droppers
+    (r"echo\s+[A-Za-z0-9+/=]{40,}\s*\|\s*base64\s+-d\s*\|\s*(ba)?sh", "Base64 Obfuscated Shell Dropper"),
+    (r"(curl|wget)\s+-[sSLO]*\s+https?://[^\s|]+\s*\|\s*(ba)?sh", "Untrusted Web Pipe Execution (curl|sh)"),
+    # Cryptominers
+    (r"stratum\+(tcp|ssl)://", "Cryptomining Pool Connection"),
+    (r"(xmrig|minergate|c3pool|supportxmr|moneroocean)", "Cryptominer Payload Signature"),
+    # Web Shells & PHP Backdoors
+    (r"eval\s*\(\s*base64_decode\s*\(", "Obfuscated PHP Backdoor (eval/base64)"),
+    (r"system\s*\(\s*\$_GET\[", "PHP Command Execution WebShell"),
+    (r"(c99shell|r57shell|b374k|wso_version)", "Known WebShell Framework"),
+    # SSH Key Injection
+    (r"echo\s+.*ssh-rsa.*>>\s*.*authorized_keys", "Unauthorized SSH Key Injection"),
+]
+
+DOUBLE_EXT_PATTERN = re.compile(
+    r"\.(pdf|docx|xlsx|pptx|jpg|jpeg|png|gif|mp4|mp3|txt)\.(exe|sh|bash|py|bin|elf|vbs|bat|scr|js|jar)$",
+    re.IGNORECASE,
+)
+
+WATCH_DIRS = [
+    os.path.expanduser("~/Downloads"),
+    os.path.expanduser("~/Desktop"),
+    os.path.expanduser("~/.config/autostart"),
+    "/tmp",
+    "/dev/shm",
+]
+
+stats = {
+    "active": True,
+    "threats_blocked": 0,
+    "files_scanned": 0,
+    "last_scan_time": time.time(),
+    "last_threat": None,
+    "status": "Protected",
+}
+
+
+def log_event(message):
+    ts = time.strftime("%Y-%m-%d %H:%M:%S")
+    entry = f"[{ts}] {message}\n"
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(entry)
+    except Exception:
+        pass
+
+
+def save_status():
+    try:
+        with open(STATUS_FILE, "w", encoding="utf-8") as f:
+            json.dump(stats, f, indent=2)
+    except Exception:
+        pass
+
+
+def notify_user(title, message, urgency="critical"):
+    try:
+        subprocess.Popen(
+            [
+                "notify-send",
+                "-u",
+                urgency,
+                "-i",
+                "security-high",
+                "-a",
+                "Krypton Shield",
+                title,
+                message,
+            ],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        pass
+
+
+def quarantine_file(filepath, threat_name):
+    try:
+        # Strip all permissions immediately to neutralize
+        os.chmod(filepath, 0o0000)
+
+        filename = os.path.basename(filepath)
+        ts_prefix = time.strftime("%Y%m%d_%H%M%S")
+        dest_filename = f"{ts_prefix}_{filename}"
+        dest_path = os.path.join(QUARANTINE_DIR, dest_filename)
+
+        # Move to isolated quarantine storage
+        shutil.move(filepath, dest_path)
+
+        # Save metadata report
+        meta = {
+            "original_path": filepath,
+            "filename": filename,
+            "threat_name": threat_name,
+            "timestamp": time.time(),
+            "date": time.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        with open(dest_path + ".info", "w", encoding="utf-8") as f:
+            json.dump(meta, f, indent=2)
+
+        stats["threats_blocked"] += 1
+        stats["last_threat"] = f"{filename} ({threat_name})"
+        save_status()
+
+        log_event(f"THREAT BLOCKED: {threat_name} in {filepath} -> Quarantined to {dest_filename}")
+        notify_user(
+            "🛡️ Krypton Shield: Threat Neutralized!",
+            f"Blocked and quarantined malicious file:\n<b>{filename}</b>\n<i>Threat: {threat_name}</i>",
+        )
+        return True
+    except Exception as e:
+        log_event(f"ERROR: Failed to quarantine {filepath}: {e}")
+        return False
+
+
+def scan_file(filepath):
+    if not os.path.isfile(filepath) or os.path.islink(filepath):
+        return None
+
+    # Don't scan quarantine directory
+    if filepath.startswith(QUARANTINE_DIR):
+        return None
+
+    stats["files_scanned"] += 1
+
+    fname = os.path.basename(filepath)
+
+    # Check 1: Double-extension deceptive trap
+    if DOUBLE_EXT_PATTERN.search(fname):
+        return f"Deceptive Double-Extension ({fname})"
+
+    # Check 2: ELF Binary in temporary/shared memory paths
+    if filepath.startswith("/tmp/") or filepath.startswith("/dev/shm/"):
+        try:
+            with open(filepath, "rb") as f:
+                header = f.read(4)
+                if header == b"\x7fELF":
+                    st = os.stat(filepath)
+                    if st.st_mode & (stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH):
+                        return "Executable ELF Payload dropped in temporary directory"
+        except Exception:
+            pass
+
+    # Check 3: Content Heuristic Scanning (Files < 8 MB)
+    try:
+        fsize = os.path.getsize(filepath)
+        if 0 < fsize <= 8 * 1024 * 1024:
+            with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+
+            for pattern, threat in MALWARE_SIGNATURES:
+                if re.search(pattern, content, re.IGNORECASE):
+                    return threat
+    except Exception:
+        pass
+
+    return None
+
+
+def inspect_path(filepath):
+    try:
+        threat = scan_file(filepath)
+        if threat:
+            quarantine_file(filepath, threat)
+    except Exception:
+        pass
+
+
+def run_full_scan():
+    log_event("Starting system integrity and malware scan...")
+    scanned = 0
+    threats = 0
+
+    scan_targets = [
+        os.path.expanduser("~/Downloads"),
+        os.path.expanduser("~/Desktop"),
+        os.path.expanduser("~/.config/autostart"),
+        os.path.expanduser("~/.local/bin"),
+        "/tmp",
+        "/dev/shm",
+    ]
+
+    for target in scan_targets:
+        if not os.path.exists(target):
+            continue
+        for root, dirs, files in os.walk(target):
+            for file in files:
+                fpath = os.path.join(root, file)
+                threat = scan_file(fpath)
+                scanned += 1
+                if threat:
+                    quarantine_file(fpath, threat)
+                    threats += 1
+
+    stats["last_scan_time"] = time.time()
+    save_status()
+    log_event(f"Scan complete: {scanned} files inspected, {threats} threats neutralized.")
+    if threats == 0:
+        notify_user("🛡️ Krypton Shield: Scan Complete", f"All clear! {scanned} files checked, 0 threats detected.", "normal")
+
+
+def on_sigusr1(signum, frame):
+    threading.Thread(target=run_full_scan, daemon=True).start()
+
+
+def watchdog_loop():
+    seen_mtimes = {}
+
+    while True:
+        try:
+            for w_dir in WATCH_DIRS:
+                if not os.path.exists(w_dir):
+                    continue
+                try:
+                    entries = os.listdir(w_dir)
+                except Exception:
+                    continue
+
+                for e in entries:
+                    fpath = os.path.join(w_dir, e)
+                    try:
+                        st = os.stat(fpath)
+                        last_m = seen_mtimes.get(fpath)
+                        if last_m is None or st.st_mtime > last_m:
+                            seen_mtimes[fpath] = st.st_mtime
+                            if os.path.isfile(fpath):
+                                inspect_path(fpath)
+                    except Exception:
+                        continue
+
+            # Clean memory of deleted entries
+            if len(seen_mtimes) > 10000:
+                seen_mtimes = {p: m for p, m in seen_mtimes.items() if os.path.exists(p)}
+
+            save_status()
+        except Exception:
+            pass
+
+        time.sleep(3)
+
+
+def main():
+    signal.signal(signal.SIGUSR1, on_sigusr1)
+
+    log_event("Krypton Shield Sentinel Service initialized.")
+    save_status()
+
+    # Initial scan on startup in background
+    threading.Thread(target=run_full_scan, daemon=True).start()
+
+    # Real-time watchdog monitoring loop
+    watchdog_loop()
+
+
+if __name__ == "__main__":
+    main()

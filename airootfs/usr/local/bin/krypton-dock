@@ -12,6 +12,7 @@ Requirements:
 import glob
 import json
 import os
+import shlex
 import signal
 import subprocess
 import sys
@@ -498,19 +499,19 @@ class KryptonDock(Gtk.Window):
             menu = Gtk.Menu()
 
             r_item = Gtk.MenuItem(label="🚀 Application Launcher")
-            r_item.connect("activate", lambda _: subprocess.Popen("rofi -show drun", shell=True))
+            r_item.connect("activate", lambda _: subprocess.Popen(["rofi", "-show", "drun"]))
             menu.append(r_item)
 
             t_item = Gtk.MenuItem(label="💻 Terminal (Kitty)")
-            t_item.connect("activate", lambda _: subprocess.Popen("kitty", shell=True))
+            t_item.connect("activate", lambda _: subprocess.Popen(["kitty"]))
             menu.append(t_item)
 
             f_item = Gtk.MenuItem(label="📁 File Explorer (Thunar)")
-            f_item.connect("activate", lambda _: subprocess.Popen("thunar", shell=True))
+            f_item.connect("activate", lambda _: subprocess.Popen(["thunar"]))
             menu.append(f_item)
 
             s_item = Gtk.MenuItem(label="⚙ Settings")
-            s_item.connect("activate", lambda _: subprocess.Popen("/usr/local/bin/krypton-settings", shell=True))
+            s_item.connect("activate", lambda _: subprocess.Popen(["/usr/local/bin/krypton-settings"]))
             menu.append(s_item)
 
             menu.append(Gtk.SeparatorMenuItem())
@@ -532,11 +533,11 @@ class KryptonDock(Gtk.Window):
             menu.append(Gtk.SeparatorMenuItem())
 
             p_item = Gtk.MenuItem(label="⏻ Power Off")
-            p_item.connect("activate", lambda _: subprocess.Popen("systemctl poweroff", shell=True))
+            p_item.connect("activate", lambda _: subprocess.Popen(["systemctl", "poweroff"]))
             menu.append(p_item)
 
             reb_item = Gtk.MenuItem(label="🔄 Restart")
-            reb_item.connect("activate", lambda _: subprocess.Popen("systemctl reboot", shell=True))
+            reb_item.connect("activate", lambda _: subprocess.Popen(["systemctl", "reboot"]))
             menu.append(reb_item)
 
             menu.show_all()
@@ -544,7 +545,7 @@ class KryptonDock(Gtk.Window):
             return True
 
         # Left click -> Open Rofi Launcher
-        subprocess.Popen("rofi -show drun", shell=True)
+        subprocess.Popen(["rofi", "-show", "drun"])
         return True
 
     def on_pin_button_press(self, widget, event, pin, matching_wins):
@@ -579,7 +580,7 @@ class KryptonDock(Gtk.Window):
                 menu.append(Gtk.SeparatorMenuItem())
 
             launch_item = Gtk.MenuItem(label=f"🚀 Launch New {pin['name']}")
-            launch_item.connect("activate", lambda _: subprocess.Popen(pin["cmd"], shell=True))
+            launch_item.connect("activate", lambda _, c=pin["cmd"]: subprocess.Popen(shlex.split(c) if isinstance(c, str) else c))
             menu.append(launch_item)
 
             unpin_item = Gtk.MenuItem(label=f"❌ Unpin {pin['name']} from Taskbar")
@@ -600,7 +601,8 @@ class KryptonDock(Gtk.Window):
             if addr:
                 subprocess.Popen(["hyprctl", "dispatch", "focuswindow", f"address:{addr}"])
         else:
-            subprocess.Popen(pin["cmd"], shell=True)
+            c = pin["cmd"]
+            subprocess.Popen(shlex.split(c) if isinstance(c, str) else c)
         return True
 
     def on_running_button_press(self, widget, event, client):
