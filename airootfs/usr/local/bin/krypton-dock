@@ -48,7 +48,7 @@ PINS_FILE = os.path.expanduser("~/.config/krypton/dock_pins.json")
 
 DEFAULT_PINS = [
     {"id": "terminal", "name": "Terminal", "icon_name": "kitty", "cmd": "kitty", "class_match": "kitty"},
-    {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code"},
+    {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code|code-oss|Code|visual-studio-code"},
     {"id": "git", "name": "LazyGit", "icon_name": "git", "cmd": "kitty --class lazygit -e lazygit", "class_match": "lazygit"},
     {"id": "browser", "name": "Helium Browser", "icon_name": "helium", "cmd": "helium-browser", "class_match": "helium|chromium|firefox"},
     {"id": "files", "name": "Files", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar|krypton-files"},
@@ -88,7 +88,7 @@ CATALOG_APPS = [
     {"id": "files", "name": "Files (File Explorer)", "icon_name": "thunar", "cmd": "thunar", "class_match": "thunar|krypton-files"},
     {"id": "browser", "name": "Helium Browser", "icon_name": "helium", "cmd": "helium-browser", "class_match": "helium|chromium"},
     {"id": "firefox", "name": "Firefox", "icon_name": "firefox", "cmd": "firefox", "class_match": "firefox"},
-    {"id": "code", "name": "VS Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code"},
+    {"id": "code", "name": "Visual Studio Code", "icon_name": "com.visualstudio.code", "cmd": "code --no-sandbox", "class_match": "code|code-oss|Code|visual-studio-code"},
     {"id": "git", "name": "LazyGit", "icon_name": "git", "cmd": "kitty --class lazygit -e lazygit", "class_match": "lazygit"},
     {"id": "calc", "name": "Calculator", "icon_name": "accessories-calculator", "cmd": "gnome-calculator", "class_match": "Calculator"},
     {"id": "btop", "name": "Task Manager", "icon_name": "utilities-system-monitor", "cmd": "kitty -e btop", "class_match": "btop"},
