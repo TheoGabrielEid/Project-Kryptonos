@@ -496,16 +496,6 @@ class KryptonDock(Gtk.Window):
                     btn.connect("button-press-event", self.on_running_button_press, c)
                     self.outer_box.pack_start(btn, False, False, 0)
 
-            # 4. Quick Window Mode Switcher Button
-            self.add_sep()
-            cur_mode = self.get_current_mode()
-            mode_lbl = "🪟 Windows" if cur_mode == "windows" else "⚡ Tiling"
-            mode_btn = Gtk.Button(label=mode_lbl)
-            mode_btn.set_tooltip_text(f"Window Mode: {cur_mode.capitalize()}\nClick to switch instantly between Windows Floating and Hyprland Tiling")
-            mode_btn.get_style_context().add_class("dock-mode-btn")
-            mode_btn.connect("clicked", self.on_toggle_mode)
-            self.outer_box.pack_start(mode_btn, False, False, 0)
-
             self.outer_box.show_all()
         except Exception as e:
             print("Error in rebuild_dock:", e)
