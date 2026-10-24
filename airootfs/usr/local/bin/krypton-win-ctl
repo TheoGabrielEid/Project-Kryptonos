@@ -65,6 +65,10 @@ set_window_mode() {
 # ==============================================================================
 # KryptonOS Window Mode: Windows Style (Floating & Resizable)
 # ==============================================================================
+windowrule = match:class ^(.*)$, float true
+windowrule = match:class ^(kitty)$, size 68% 62%
+windowrule = match:class ^(kitty)$, center true
+
 general {
     layout = dwindle
     resize_on_border = true

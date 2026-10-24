@@ -525,6 +525,11 @@ class KryptonDock(Gtk.Window):
             s_item.connect("activate", lambda _: subprocess.Popen("/usr/local/bin/krypton-settings", shell=True))
             menu.append(s_item)
 
+            mode_label = "🪟 Switch to Windows Style (Floating)" if self.get_current_mode() == "hyprland" else "⚡ Switch to Hyprland Tiling (Grid)"
+            wm_item = Gtk.MenuItem(label=mode_label)
+            wm_item.connect("activate", lambda _: subprocess.Popen(["/usr/local/bin/krypton-win-ctl", "toggle-mode"]))
+            menu.append(wm_item)
+
             menu.append(Gtk.SeparatorMenuItem())
 
             pin_sub = Gtk.MenuItem(label="📌 Pin Apps to Taskbar...")
