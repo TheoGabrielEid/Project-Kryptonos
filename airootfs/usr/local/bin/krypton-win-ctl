@@ -88,10 +88,12 @@ EOF
             pkill -USR1 -f krypton-window-mode-daemon 2>/dev/null || true
         fi
 
-        # Float all currently open windows
+        # Float all currently open windows and ensure clean windowed geometry
         if command -v jq >/dev/null 2>&1; then
             for addr in $(hyprctl clients -j 2>/dev/null | jq -r '.[].address // empty'); do
                 hyprctl dispatch setfloating "address:${addr}" >/dev/null 2>&1 || true
+                hyprctl dispatch resizewindowpixel "exact 72% 70%,address:${addr}" >/dev/null 2>&1 || true
+                hyprctl dispatch centerwindow "address:${addr}" >/dev/null 2>&1 || true
             done
         fi
 
@@ -155,14 +157,34 @@ case "$ACTION" in
         if [ -n "$TARGET_ADDR" ]; then
             hyprctl dispatch focuswindow "${TARGET_ADDR}"
         fi
-        hyprctl dispatch fullscreen 1
+        python3 -c "
+import subprocess, json
+try:
+    res = subprocess.run(['hyprctl', 'activewindow', '-j'], capture_output=True, text=True, timeout=2)
+    w = json.loads(res.stdout) if res.stdout.strip() else {}
+    fs = bool(w.get('fullscreen', False))
+    floating = bool(w.get('floating', False))
+    addr = w.get('address', '')
+    if fs:
+        # Currently fullscreen/maximized -> unmaximize to windowed
+        subprocess.run(['hyprctl', 'dispatch', 'fullscreen', '1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if floating and addr:
+            subprocess.run(['hyprctl', 'dispatch', 'resizewindowpixel', f'exact 72% 70%,address:{addr}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(['hyprctl', 'dispatch', 'centerwindow', f'address:{addr}'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        # Currently windowed -> maximize
+        subprocess.run(['hyprctl', 'dispatch', 'fullscreen', '1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+except Exception:
+    subprocess.run(['hyprctl', 'dispatch', 'fullscreen', '1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+" 2>/dev/null || hyprctl dispatch fullscreen 1
         ;;
     minimize)
         TARGET_ADDR=$(format_addr "${ARG:-}")
         if [ -n "$TARGET_ADDR" ]; then
-            hyprctl dispatch focuswindow "${TARGET_ADDR}"
+            hyprctl dispatch movetoworkspacesilent "special:minimized,${TARGET_ADDR}"
+        else
+            hyprctl dispatch movetoworkspacesilent "special:minimized"
         fi
-        hyprctl dispatch movetoworkspacesilent special:minimized
         ;;
     restore)
         TARGET_ADDR=$(format_addr "${ARG:-}")

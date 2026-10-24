@@ -28,7 +28,7 @@ def safe_as_rgb(c):
 _patched = False
 _last_cols = 80
 _last_cell_w = 10.0
-_last_win_w = 800.0
+_last_win_w = 1200.0
 
 
 def get_hypr_env():
@@ -64,53 +64,121 @@ def do_minimize():
         pass
 
 
-def handle_button_click(os_win_id, x, is_double=False):
+def get_window_geometry(os_win_id):
+    """Safely unpacks Kitty viewport geometry without tuple length assumptions."""
     global _last_cell_w, _last_win_w
     cw = _last_cell_w
     vw = _last_win_w
     try:
         from kitty.fast_data_types import cell_size_for_window, viewport_for_window
-        cw_val, _ = cell_size_for_window(os_win_id)
-        if cw_val and cw_val > 0:
-            cw = float(cw_val)
-        _, _, vw_val, _ = viewport_for_window(os_win_id)
-        if vw_val and vw_val > 0:
-            vw = float(vw_val)
+        cs = cell_size_for_window(os_win_id)
+        if cs and len(cs) >= 1 and cs[0] > 0:
+            cw = float(cs[0])
+            _last_cell_w = cw
+
+        vp = viewport_for_window(os_win_id)
+        # Modern Kitty (0.49+) returns 6-tuple: (central, tab_bar, vw, vh, cell_w, cell_h)
+        # Older Kitty returns 4-tuple: (x, y, vw, vh)
+        if vp and len(vp) >= 4:
+            vw = float(vp[2])
+            _last_win_w = vw
+        if vp and len(vp) >= 6 and vp[4] > 0:
+            cw = float(vp[4])
+            _last_cell_w = cw
     except Exception:
         pass
+    return cw, vw
 
+
+def get_cols_from_right(os_win_id, x):
+    global _last_cols
+    cw, vw = get_window_geometry(os_win_id)
     try:
-        dist_px = vw - float(x)
-        cols_from_right = dist_px / max(1.0, cw)
-
-        # Buttons layout on right:
-        # [  ✕  ] Close button: 0 to 4.5 cols from right
-        if 0 <= cols_from_right <= 4.5:
-            do_close(os_win_id)
-            return True
-        # [  🗖 ] Maximize / Windowed: 4.5 to 8.5 cols from right
-        elif 4.5 < cols_from_right <= 8.5:
-            do_maximize()
-            return True
-        # [  🗕 ] Minimize: 8.5 to 13.5 cols from right
-        elif 8.5 < cols_from_right <= 13.5:
-            do_minimize()
-            return True
-        # Double click anywhere on top tab bar: toggle Maximize / Windowed
-        elif is_double:
-            do_maximize()
-            return True
+        x_val = float(x)
+        # Support both cell-based and pixel-based coordinates from GLFW
+        if x_val <= _last_cols + 2 and _last_cols > 0:
+            cols_col = float(_last_cols) - x_val
+            if 0 <= cols_col <= 25:
+                return cols_col
+        dist_px = vw - x_val
+        return dist_px / max(1.0, cw)
     except Exception:
-        pass
+        return 999.0
+
+
+def is_in_button_area(os_win_id, x):
+    cols = get_cols_from_right(os_win_id, x)
+    return 0 <= cols <= 15.0
+
+
+def handle_button_click(os_win_id, x, is_double=False):
+    cols_from_right = get_cols_from_right(os_win_id, x)
+
+    # Buttons layout on right edge:
+    # [  ✕  ] Close button: 0 to 4.5 cols from right
+    if 0 <= cols_from_right <= 4.5:
+        do_close(os_win_id)
+        return True
+    # [  🗖 ] Maximize / Windowed: 4.5 to 8.5 cols from right
+    elif 4.5 < cols_from_right <= 8.5:
+        do_maximize()
+        return True
+    # [  🗕 ] Minimize: 8.5 to 14.5 cols from right
+    elif 8.5 < cols_from_right <= 14.5:
+        do_minimize()
+        return True
+    # Double click anywhere on top tab bar: toggle Maximize / Windowed
+    elif is_double:
+        do_maximize()
+        return True
     return False
 
 
+def _krypton_boss_mouse(self, os_window_id, x, y, button=0, modifiers=0, action=1, *args, **kwargs):
+    # Action 1 = GLFW_PRESS; intercept click on titlebar buttons and prevent tab drag
+    if button == 0:
+        if action == 1:
+            if handle_button_click(os_window_id, x, is_double=False):
+                try:
+                    tm = self.os_window_map.get(os_window_id)
+                    if tm and hasattr(tm, "set_tab_being_dragged"):
+                        tm.set_tab_being_dragged(None)
+                except Exception:
+                    pass
+                return True
+        elif action == 0:
+            # Action 0 = GLFW_RELEASE; consume release if inside button area
+            if is_in_button_area(os_window_id, x):
+                return True
+
+    orig = getattr(self.__class__, "_krypton_orig_boss_mouse", None)
+    if orig:
+        return orig(self, os_window_id, x, y, button, modifiers, action, *args, **kwargs)
+
+
+def _krypton_tm_mouse(self, x, y, button=0, modifiers=0, action=1, *args, **kwargs):
+    os_win_id = getattr(self, "os_window_id", 0)
+    if button == 0:
+        if action == 1:
+            if handle_button_click(os_win_id, x, is_double=False):
+                try:
+                    if hasattr(self, "set_tab_being_dragged"):
+                        self.set_tab_being_dragged(None)
+                except Exception:
+                    pass
+                return True
+        elif action == 0:
+            if is_in_button_area(os_win_id, x):
+                return True
+
+    orig = getattr(self.__class__, "_krypton_orig_tm_mouse", None)
+    if orig:
+        return orig(self, x, y, button, modifiers, action, *args, **kwargs)
+
+
 def _krypton_boss_activate(self, os_window_id, x, is_double=False, *args, **kwargs):
-    try:
-        if handle_button_click(os_window_id, x, is_double=is_double):
-            return 0
-    except Exception:
-        pass
+    if handle_button_click(os_window_id, x, is_double=is_double):
+        return 0
 
     orig = getattr(self.__class__, "_krypton_orig_boss_activate", None)
     if orig:
@@ -118,12 +186,9 @@ def _krypton_boss_activate(self, os_window_id, x, is_double=False, *args, **kwar
 
 
 def _krypton_tm_activate(self, x, is_double=False, *args, **kwargs):
-    try:
-        os_win_id = getattr(self, "os_window_id", 0)
-        if handle_button_click(os_win_id, x, is_double=is_double):
-            return
-    except Exception:
-        pass
+    os_win_id = getattr(self, "os_window_id", 0)
+    if handle_button_click(os_win_id, x, is_double=is_double):
+        return
 
     orig = getattr(self.__class__, "_krypton_orig_tm_activate", None)
     if orig:
@@ -137,6 +202,9 @@ def _ensure_patch():
 
     try:
         from kitty.boss import Boss
+        if not hasattr(Boss, "_krypton_orig_boss_mouse"):
+            Boss._krypton_orig_boss_mouse = getattr(Boss, "handle_tab_bar_mouse", None)
+            Boss.handle_tab_bar_mouse = _krypton_boss_mouse
         if not hasattr(Boss, "_krypton_orig_boss_activate"):
             Boss._krypton_orig_boss_activate = getattr(Boss, "activate_tab_at", None)
             Boss.activate_tab_at = _krypton_boss_activate
@@ -145,14 +213,18 @@ def _ensure_patch():
 
     try:
         boss = get_boss()
-        if boss is not None and not hasattr(boss, "_krypton_inst_patched"):
+        if boss is not None and not hasattr(boss, "_krypton_inst_mouse_patched"):
+            boss.handle_tab_bar_mouse = types.MethodType(_krypton_boss_mouse, boss)
             boss.activate_tab_at = types.MethodType(_krypton_boss_activate, boss)
-            boss._krypton_inst_patched = True
+            boss._krypton_inst_mouse_patched = True
     except Exception:
         pass
 
     try:
         from kitty.tabs import TabManager
+        if not hasattr(TabManager, "_krypton_orig_tm_mouse"):
+            TabManager._krypton_orig_tm_mouse = getattr(TabManager, "handle_tab_bar_mouse", None)
+            TabManager.handle_tab_bar_mouse = _krypton_tm_mouse
         if not hasattr(TabManager, "_krypton_orig_tm_activate"):
             TabManager._krypton_orig_tm_activate = getattr(TabManager, "activate_tab_at", None)
             TabManager.activate_tab_at = _krypton_tm_activate
@@ -160,6 +232,13 @@ def _ensure_patch():
         pass
 
     _patched = True
+
+
+# Run initial patching on module load
+try:
+    _ensure_patch()
+except Exception:
+    pass
 
 
 def draw_tab(
@@ -180,19 +259,13 @@ def draw_tab(
 
     _last_cols = screen.columns
     try:
-        from kitty.fast_data_types import cell_size_for_window, viewport_for_window
         os_win = getattr(extra_data, "os_window_id", 0)
-        cw, _ = cell_size_for_window(os_win)
-        if cw:
-            _last_cell_w = float(cw)
-        _, _, vw, _ = viewport_for_window(os_win)
-        if vw:
-            _last_win_w = float(vw)
+        get_window_geometry(os_win)
     except Exception:
         pass
 
     try:
-        # Active vs Inactive Tab Header
+        # Active vs Inactive Tab Header (Catppuccin Mocha aesthetic)
         if tab.is_active:
             screen.cursor.bg = safe_as_rgb(draw_data.active_bg)
             screen.cursor.fg = safe_as_rgb(draw_data.active_fg)
